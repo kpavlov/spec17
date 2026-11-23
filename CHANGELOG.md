@@ -2,15 +2,17 @@
 
 ## 0.3.0 — Unreleased
 
-- Detect priority and effort hints in requirements; filter by them in the dashboard.
-- Add a requirements reference graph with circular reference groups.
-- Recognize tags in comments attached to tests and improve test detection, including Swift tests.
-- Scan requirement citations in Svelte files without custom configuration.
-- Expose the embedded agent skill through the MCP Skills extension.
-- Filter requirements with a click that selects one value, Shift, Ctrl or ⌘ + click to add or remove values, and All when every value is selected; fields with nothing to choose are hidden, and the Filters button becomes an icon that is disabled when there is nothing to filter by; selecting a segment no longer changes its width.
-- Show up to five lines of requirement text in graph and link previews.
-- Describe in language profiles which lines attach to a test (`annotation`), how a test body ends without braces (`block_*`) and which quotes are lifetimes (`lifetimes`); `spec17.json` can replace the priority and effort hint patterns. **Breaking:** a profile in `spec17.json` that relied on `@` lines attaching to a test must now set `annotation`, and conflicting `block_*` fields are an error.
-- Use CodeGraph's function ranges and names only while the index holds the file's current content (by hash, not modification time), so the same tree gives the same output.
+- Detect priority and effort hints in requirements, show them as pills and filter by them.
+- Add a graph of references between requirements, with circular references highlighted.
+- Recognize requirement tags in comments attached to tests, reported apart from invalid tests.
+- Improve test detection across languages, including Swift.
+- Expose the embedded agent skill through the MCP Skills extension, and rewrite it around the question asked.
+- Rework the requirement filters: one value per click or several with a modifier key, and no fields with nothing to choose.
+- Use the same filter toolbar on the Tests page, and hide its preview until a test is selected.
+- Link requirement notes on Changes to the file's diff, and show longer requirement previews.
+- Configure test detection in language profiles instead of code. **Breaking:** a `spec17.json` profile that relied on `@` lines attaching to a test must now set `annotation`.
+- Use CodeGraph data only while it matches the current files, so the same tree gives the same output.
+- Scan large test suites faster.
 
 ## 0.2.0
 
