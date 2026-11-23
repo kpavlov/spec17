@@ -956,12 +956,12 @@ mod tests {
         for (location, expected) in [
             (json!({}), vec!["AAA-01", "AAA-02", "AAA-03", "AAA-04"]),
             (json!({"line": 1}), vec![]),
-            (json!({"line": 4}), vec!["AAA-01", "AAA-02"]),
+            (json!({"line": 4}), vec!["AAA-01", "AAA-02", "AAA-03"]),
             (json!({"line": 6}), vec![]),
             (json!({"line": 10}), vec!["AAA-02", "AAA-04"]),
-            (json!({"line": 1, "end_line": 3}), vec!["AAA-01", "AAA-02"]),
-            (json!({"line": 4, "end_line": 9}), vec!["AAA-01", "AAA-02"]),
-            (json!({"line": 4, "end_line": 10}), vec!["AAA-01", "AAA-02", "AAA-04"]),
+            (json!({"line": 1, "end_line": 3}), vec!["AAA-01", "AAA-02", "AAA-03"]),
+            (json!({"line": 4, "end_line": 9}), vec!["AAA-01", "AAA-02", "AAA-03"]),
+            (json!({"line": 4, "end_line": 10}), vec!["AAA-01", "AAA-02", "AAA-03", "AAA-04"]),
         ] {
             let mut args = location;
             args["test_file"] = json!(file);

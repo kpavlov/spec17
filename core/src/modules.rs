@@ -13,7 +13,7 @@ const NOTE: &str = "Detected from markers in test files, not run: a listed test 
 pub struct TestCase {
     pub name: String,
     /// CodeGraph's qualified name of the declaration, when the index has it.
-    #[serde(skip_serializing_if = "String::is_empty")]
+    #[serde(default, skip_serializing_if = "String::is_empty")]
     pub qualified: String,
     pub line: usize,
     /// Requirement IDs tagged on the test.
@@ -75,33 +75,25 @@ pub struct ModulesView {
 static QUOTED: LazyLock<Regex> = LazyLock::new(|| Regex::new(r#"["'`]([^"'`]+)["'`]"#).unwrap());
 
 impl Analysis {
-    /// A case starts on its marker. Tags come from its declaration and up to three attached comments or annotations above the marker.
+    /// A case starts on its marker. Tags come from its header and comments in its body.
     fn cases_in(&self, file: &str) -> Vec<TestCase> {
         // the profile of the file's extension, else the dominant one (`Project::lang`)
         let lang = self.p.lang(file);
-        let (marker, call) = (&lang.case, lang.call);
+        let call = lang.call;
         let decls = self.graph.as_ref().and_then(|g| g.decls_in(file).ok()).unwrap_or_default();
         let ls = self.p.lines(file);
         let mut tests = vec![];
-        // a marker inside a string literal (a fixture that writes a test file) is not a test case
-        let unescaped_quotes = |t: &str| t.matches('"').count() - t.matches("\\\"").count();
-        let opens = |l: &str| marker.find_iter(l).any(|f| call || unescaped_quotes(&l[..f.start()]) % 2 == 0);
-        for (m, line) in ls.iter().enumerate().filter(|(_, l)| opens(l)) {
+        for (m, at, head, end) in self.p.test_ranges(file) {
+            let line = &ls[m];
             // the declaration is on the marker line or just below an attribute / annotation
-            let decl = (m..(m + 4).min(ls.len())).find_map(|i| lang.decl.captures(&ls[i]).and_then(|c| c.get(1)).map(|c| (i, c.as_str().to_string())));
-            let (at, name) = match (decl, call) {
-                (Some((i, n)), false) => (i, n),
-                _ => (m, QUOTED.captures(line).map_or_else(|| line.trim().to_string(), |c| c[1].to_string())),
+            let decl = lang.decl.captures(&ls[at]).and_then(|c| c.get(1)).map(|c| c.as_str().to_string());
+            let name = match (decl, call) {
+                (Some(n), false) => n,
+                _ => QUOTED.captures(line).map_or_else(|| line.trim().to_string(), |c| c[1].to_string()),
             };
-            let marker_text = line.trim_start();
-            let indent = line.len() - marker_text.len();
-            let leading = ls[..m].iter().rev().take(3).take_while(|l| {
-                let text = l.trim_start();
-                let annotation = text.starts_with('@') || text.starts_with("#[")
-                    || ['[', '<'].into_iter().any(|c| marker_text.starts_with(c) && text.starts_with(c));
-                l.len() - text.len() == indent && (annotation || lang.is_comment(text))
-            }).count();
-            let ids = ls[m - leading..=at].iter().flat_map(|l| self.p.tagged(l)).collect::<BTreeSet<_>>().into_iter().collect();
+            let ids = ls[head..=at].iter().flat_map(|l| self.p.tagged(l))
+                .chain(ls[at + 1..end].iter().filter_map(|l| lang.comment_of(l)).flat_map(|l| self.p.tagged(l)))
+                .collect::<BTreeSet<_>>().into_iter().collect();
             let qualified = decls.iter().filter(|(lo, hi, _)| *lo <= at as i64 + 1 && at as i64 + 1 <= *hi).min_by_key(|(lo, hi, _)| hi - lo).map(|d| d.2.clone()).unwrap_or_default();
             tests.push(TestCase { name, qualified, line: m + 1, ids });
         }

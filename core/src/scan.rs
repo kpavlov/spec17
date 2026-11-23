@@ -604,6 +604,43 @@ impl Project {
         self.rx.tag.captures_iter(line).flat_map(|g| self.rx.mention.captures_iter(&g[1]).map(|m| m[1].to_string()).filter(|i| is_id(i)).collect::<Vec<_>>()).collect()
     }
 
+    // (SCAN-35) The marker, declaration, attached header start and exclusive body end.
+    pub(crate) fn test_ranges(&self, file: &str) -> Vec<(usize, usize, usize, usize)> {
+        let lang = self.lang(file);
+        let ls = self.lines(file);
+        let mut ranges = Vec::new();
+        for (m, line) in ls.iter().enumerate() {
+            let opens = lang.case.find_iter(line).any(|f| {
+                lang.call || (line[..f.start()].matches('"').count() - line[..f.start()].matches("\\\"").count()) % 2 == 0
+            });
+            if !opens || lang.is_comment(line.trim_start()) { continue; }
+            let at = if lang.call { m } else {
+                (m..ls.len()).take_while(|&i| {
+                    let text = ls[i].trim_start();
+                    i == m || lang.decl.is_match(&ls[i]) || lang.is_comment(text) || text.starts_with('@') || text.starts_with("#[")
+                }).find(|&i| lang.decl.is_match(&ls[i])).unwrap_or(m)
+            };
+            let indent = line.len() - line.trim_start().len();
+            let leading = ls[..m].iter().rev().take_while(|l| {
+                let text = l.trim_start();
+                l.len() - text.len() == indent && (lang.is_comment(text) || text.starts_with('@') || text.starts_with("#[")
+                    || ['[', '<'].into_iter().any(|c| line.trim_start().starts_with(c) && text.starts_with(c)))
+            }).count();
+            let end = if file.ends_with(".py") {
+                let decl_indent = ls[at].len() - ls[at].trim_start().len();
+                (at + 1..ls.len()).find(|&i| {
+                    let text = ls[i].trim_start();
+                    !text.is_empty() && ls[i].len() - text.len() <= decl_indent
+                }).unwrap_or(ls.len())
+            } else {
+                // shortcut: non-Python bodies use braces, add language-aware boundaries for other block syntax.
+                at + body(&ls, at + 1, ls.len() - at).len()
+            };
+            ranges.push((m, at, m - leading, end));
+        }
+        ranges
+    }
+
     // (SCAN-02)
     /// {id: [ref]} for every `[ID]` or `[ID, ID]` tag in the test folders.
     pub fn tests(&self) -> Refs {
@@ -704,6 +741,7 @@ impl Project {
         let mut out: Vec<(&'static str, Vec<(String, String, usize)>)> = ["unknown", "retired", "comment-only", "disabled", "no-assert"].into_iter().map(|k| (k, vec![])).collect();
         let slot = |out: &mut Vec<(&'static str, Vec<_>)>, k: &str, v| out.iter_mut().find(|(n, _)| *n == k).unwrap().1.push(v);
         let mut ids: Vec<&String> = t.keys().collect();
+        let ranges: std::collections::HashMap<_, _> = self.test_files().iter().map(|f| (f.as_str(), self.test_ranges(f))).collect();
         ids.sort();
         for i in ids {
             let refs = &t[i];
@@ -714,7 +752,7 @@ impl Project {
                 slot(&mut out, "unknown", first);
             } else {
                 for kind in ["comment-only", "disabled", "no-assert"] {
-                    if refs.iter().all(|r| self.flag(r, kind)) {
+                    if refs.iter().all(|r| self.flag(r, kind, &ranges[r.file.as_str()])) {
                         slot(&mut out, kind, first.clone());
                     }
                 }
@@ -723,22 +761,26 @@ impl Project {
         out
     }
 
-    fn flag(&self, r: &Ref, kind: &str) -> bool {
+    // (SCAN-35)
+    fn flag(&self, r: &Ref, kind: &str, ranges: &[(usize, usize, usize, usize)]) -> bool {
         let (ls, lang) = (self.lines(&r.file), self.lang(&r.file));
+        let comment = lang.is_comment(&r.text);
+        let start = r.line - 1;
+        let case = ranges.iter().copied().filter(|&(_, _, head, end)| head <= start && start < end).last();
         match kind {
-            "comment-only" => lang.is_comment(&r.text),
+            "comment-only" => comment && case.is_none(),
             "disabled" => {
-                // the attribute: the tag line up to the declaration line
-                let mut head = vec![];
-                for x in ls.iter().skip(r.line - 1).take(4) {
-                    head.push(x);
-                    if lang.decl.is_match(x) {
-                        break;
-                    }
+                if let Some((_, at, head, _)) = case {
+                    ls[head..=at].iter().any(|x| lang.off.is_match(x))
+                } else {
+                    !comment && ls.iter().skip(start).take(4).take_while(|x| !lang.decl.is_match(x)).any(|x| lang.off.is_match(x))
                 }
-                !lang.is_comment(&r.text) && head.iter().any(|x| lang.off.is_match(x))
             }
-            _ => !lang.is_comment(&r.text) && !body(&ls, r.line, 200).iter().any(|x| lang.assert.is_match(x)),
+            _ => if let Some((_, at, _, end)) = case {
+                !ls[at..end].iter().any(|x| lang.assert.is_match(x))
+            } else {
+                !comment && !body(&ls, r.line, 200).iter().any(|x| lang.assert.is_match(x))
+            },
         }
     }
 

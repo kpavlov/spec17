@@ -194,11 +194,60 @@ fn each_file_reads_with_its_own_profile() {
     let a = Analysis::load(Some(&d)).unwrap();
     let r = a.report();
     let bad = |k: &str| r.invalid_tests[k].iter().map(|p| p.id.as_str()).collect::<Vec<_>>();
-    assert_eq!(bad("comment-only"), ["DEM-02"]); // a Rust attribute is not a Python comment; a `#` line in Python is
+    assert!(bad("comment-only").is_empty()); // the Python comment is attached to the test
     assert!(bad("no-assert").is_empty()); // a Python `assert` counts in a .py file
     let mut decls: Vec<String> = a.trace("DEM-04").unwrap().source_cites.iter().map(|c| c.decl.clone()).collect();
     decls.sort();
     assert_eq!(decls, ["f", "g"]);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn attached_comment_tags_are_assessed_with_the_test() {
+    let d = scratch("comment-tags");
+    write(&d, "spec17.json", r#"{"tests":["Tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n- DEM-03 MUST — c.\n");
+    write(&d, "Tests/ExampleTests.swift", "// [DEM\x2D01, DEM\x2D02]\n@MainActor\nfunc testExample() {\n    XCTAssertTrue(true)\n}\n\n// [DEM\x2D03]\n\nfunc testOther() {}\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let r = a.report();
+    assert_eq!(r.invalid_tests["comment-only"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-03"]);
+    assert!(r.invalid_tests["no-assert"].is_empty());
+    assert_eq!(a.tests_view().modules[0].files[0].tests[0].ids, ["DEM-01", "DEM-02"]);
+    let schema = serde_json::to_value(schemars::schema_for!(spec17_core::modules::TestCase)).unwrap();
+    assert!(!schema["required"].as_array().unwrap().iter().any(|field| field == "qualified"));
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn comment_tags_use_their_own_test_for_disabled_and_assertion_checks() {
+    let d = scratch("python-comment-tags");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["py"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — disabled.\n- DEM-02 MUST — no assertion.\n- DEM-03 MUST — orphan.\n");
+    write(&d, "tests/test_example.py", "@pytest.mark.skip\n# [DEM\x2D01]\ndef test_skipped():\n    assert True\n\n# [DEM\x2D02]\ndef test_without_assertion():\n    pass\n\n# [DEM\x2D03]\n\nvalue = 1\n\ndef test_other():\n    assert True\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let report = a.report();
+    let ids = |kind: &str| report.invalid_tests[kind].iter().map(|p| p.id.as_str()).collect::<Vec<_>>();
+    assert_eq!(ids("disabled"), ["DEM-01"]);
+    assert_eq!(ids("no-assert"), ["DEM-02"]);
+    assert_eq!(ids("comment-only"), ["DEM-03"]);
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!(cases[0].ids, ["DEM-01"]);
+    assert_eq!(cases[1].ids, ["DEM-02"]);
+    assert!(cases[2].ids.is_empty());
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn comment_tag_inside_a_test_belongs_to_that_test() {
+    let d = scratch("body-comment-tag");
+    write(&d, "spec17.json", r#"{"tests":["Tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "Tests/ExampleTests.swift", "func testExample() {\n    // [DEM\x2D01]\n    XCTAssertTrue(true)\n}\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let report = a.report();
+    assert!(report.invalid_tests["comment-only"].is_empty());
+    assert!(report.invalid_tests["no-assert"].is_empty());
+    assert_eq!(a.tests_view().modules[0].files[0].tests[0].ids, ["DEM-01"]);
 }
 
 #[doc = "[SCAN-34]"]

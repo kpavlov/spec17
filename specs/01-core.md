@@ -11,6 +11,7 @@ Deterministic evidence only: same tree, same text. No LLM in the core.
 - **SCAN-05** MUST — print the same text for the same tree: no clocks, randomness or map-order dependence.
 - **SCAN-06** SHOULD — take folders, extensions and regexes from an optional `spec17.json`, and fall back to defaults when it is missing.
 - **SCAN-07** MUST — report invalid test tags (unknown, retired, comment-only, disabled, no assertion) and dangling citations as problems to judge, not as verdicts.
+- **SCAN-35** SHOULD — recognize bracketed tags in comments attached directly above or inside a detected test, including intervening annotations, and assess disabled and assertion evidence against that test.
 - **SCAN-08** MUST — trace one ID to its spec text, tests and code citations.
 - **SCAN-09** SHOULD — detect what `spec17.json` leaves out: the specs folder (`specs/`, `spec/`, `docs/specs/`, `openspec/specs/`, `.kiro/specs/` and the like, a generic `docs/` only with a requirement bullet), and the source and test folders, extensions and test-file pattern of the dominant ecosystem, from the CodeGraph file list when an index exists, else from the repo's files.
 - **SCAN-11** SHOULD — also accept the common spec spellings: `*`, `+` and numbered lists, a plain, `**bold**` or `` `code` `` ID with an optional colon, the level anywhere in the line (`MUST`, `SHOULD`, `MAY`, `SHALL`), and `| ID | MUST | text |` table rows.

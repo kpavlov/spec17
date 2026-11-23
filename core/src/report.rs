@@ -280,7 +280,7 @@ impl Report {
             format!("  {k}: {}{}", head.join(", "), if v.len() > 6 { format!(", … {} more", v.len() - 6) } else { String::new() })
         }).collect();
         let tests_bad: usize = self.invalid_tests.values().map(Vec::len).sum();
-        section(&mut o, "invalid tests", tests_bad, bt, "unknown/retired = fix the tag; comment-only = no test is titled with it; disabled = switched off; no-assert = no direct assertion, verify");
+        section(&mut o, "invalid tests", tests_bad, bt, "unknown/retired = fix the tag; comment-only = no test carries it; disabled = switched off; no-assert = no direct assertion, verify");
         let app = a.app();
         section(&mut o, "specs to compare: code covered by 2+ requirements that do not cite each other", self.overlaps.len(),
             self.overlaps.iter().map(|r| format!("  {}:{} {}  [{}]", r.file.strip_prefix(&app).unwrap_or(&r.file), r.line, r.name, r.ids.join(", "))).collect(),
