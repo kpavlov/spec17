@@ -201,6 +201,28 @@ fn each_file_reads_with_its_own_profile() {
     assert_eq!(decls, ["f", "g"]);
 }
 
+#[doc = "[SCAN-39]"]
+#[test]
+fn svelte_citations_work_without_project_configuration() {
+    let d = scratch("svelte-profile");
+    write(&d, "specs/01-demo.md", "- **DEM-01** MUST — a.\n- **DEM-02** MUST — b.\n");
+    write(&d, "src/App.svelte", "<script>\n// (DEM\x2D01)\nconst value = 1;\n</script>\n<!-- (DEM\x2D02) -->\n<p>{value}</p>\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    for id in ["DEM-01", "DEM-02"] {
+        assert_eq!(a.trace(id).unwrap().source_cites[0].r.file, "src/App.svelte");
+    }
+}
+
+#[doc = "[SCAN-07]"]
+#[test]
+fn rust_matches_alone_is_not_an_assertion() {
+    let d = scratch("rust-matches");
+    write(&d, "SPEC.md", "- **DEM-01** MUST — a.\n- **DEM-02** MUST — b.\n");
+    write(&d, "tests/example.rs", "#[doc = \"[DEM\x2D01]\"]\n#[test]\nfn a() { matches!(1, 1); }\n#[doc = \"[DEM\x2D02]\"]\n#[test]\nfn b() { assert!(matches!(1, 1)); }\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert_eq!(a.report().invalid_tests["no-assert"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-01"]);
+}
+
 #[doc = "[SCAN-35]"]
 #[test]
 fn attached_comment_tags_are_assessed_with_the_test() {

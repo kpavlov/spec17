@@ -31,7 +31,8 @@ name = "rust"
 ext = ["rs"]
 comment = ["//"]
 decl = '^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:fn|struct|enum|trait|impl|type|mod)\s+([A-Za-z_]\w*)'
-assert = 'assert!|assert_eq!|assert_ne!|panic!|matches!'
+# (SCAN-07) matches! returns a boolean; it does not assert it.
+assert = 'assert!|assert_eq!|assert_ne!|panic!'
 off = '#\[ignore'
 test = '(^|/)(tests|benches)/|_test\.rs$'
 inline = true
@@ -45,6 +46,18 @@ decl = '^\s*(?:export\s+)?(?:default\s+)?(?:declare\s+)?(?:async\s+)?(?:abstract
 assert = 'expect\(|assert[.(]|\.should\b|\bexpect\.'
 off = '\.skip\(|\bxit\(|\bxdescribe\(|\.todo\('
 test = '(^|/)(__tests__|tests?|e2e|cypress)/|\.(test|spec)\.[cm]?[jt]sx?$'
+case = '^\s*(?:it|test)(?:\.\w+)*\s*\('
+call = true
+
+[[profile]]
+# (SCAN-39)
+name = "svelte"
+ext = ["svelte"]
+comment = ["//", "<!--"]
+decl = '^\s*(?:export\s+)?(?:async\s+)?(?:function\*?|class|interface|type|const)\s+([A-Za-z_$][\w$]*)'
+assert = 'expect\(|assert[.(]|\.should\b|\bexpect\.'
+off = '\.skip\(|\bxit\(|\bxdescribe\(|\.todo\('
+test = '(^|/)(__tests__|tests?|e2e|cypress)/|\.(test|spec)\.svelte$'
 case = '^\s*(?:it|test)(?:\.\w+)*\s*\('
 call = true
 

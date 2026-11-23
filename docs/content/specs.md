@@ -133,7 +133,7 @@ An ending `(manual)`, `(later)` or `(deferred)` marks a bullet; `(deferred)` mea
 ## Tests and citations
 
 - A test tag is the ID in square brackets: `[ABC-12]`, or `[ABC-12, ABC-14]` for several. Put it in the test's title, name or doc attribute, for example a Swift `@Test("[REQ_001] underscore tag")`, a Rust `#[doc = "[API-02]"]` above `#[test]`, or a Python docstring. Tags are read in files in test folders or named like tests (`test_*.py`, `*_test.go`, `*.test.ts`).
-- A source citation is an ID in a line comment (`//`, `#`, `///`) of a source file. `// (ABC-12)` is the convention; the parentheses are not required, and block comments are not scanned.
+- A source citation is an ID after a configured comment marker on the same line, such as `// (ABC-12)`; the parentheses are not required. Svelte also recognizes `<!-- (ABC-12) -->`. The scanner does not track multiline comment boundaries.
 
 The report also lists tags it distrusts, under invalid tests: an ID no spec defines (`unknown`) or a struck-out one (`retired`), an ID tagged only in comments outside detected tests (`comment-only`), only on a disabled test (`disabled`), or only on a test with no direct assertion (`no-assert`). A citation of an ID no spec defines is a dangling citation when a spec uses the same prefix, which catches typos and retired IDs.
 

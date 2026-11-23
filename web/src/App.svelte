@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { untrack } from "svelte";
+  import { tick, untrack } from "svelte";
   import { call, embedded, onToolInput, read, watch } from "$lib/transport";
   import { format, parse, type Route } from "$lib/router";
   import Markdown from "$lib/ui/Markdown.svelte";
@@ -147,6 +147,14 @@
   let history = $state<any>(null);
   let openDiffs = $state<string[]>([]);
   const toggleDiff = (p: string) => (openDiffs = openDiffs.includes(p) ? openDiffs.filter((x) => x !== p) : [...openDiffs, p]);
+  async function showDiff(path: string) {
+    if (!openDiffs.includes(path)) openDiffs = [...openDiffs, path];
+    await tick();
+    const row = document.getElementById(`changed-file-${path}`);
+    const section = row?.closest("details");
+    if (section) section.open = true;
+    row?.scrollIntoView({ block: "center" });
+  }
   let modules = $state<any>(null);
   let tests = $state<any>(null);
   let rows = $state<Row[]>([]);
@@ -529,7 +537,18 @@
       {#if !r.deleted && testedIds.has(r.id)}
         <a href={u({ tab: "tests", requirementId: r.id })} aria-label="View tagged tests for {r.id}">View tagged tests</a>
       {/if}
-      {#each noteGroups(r.notes ?? changeOf.get(r.id)?.notes ?? []) as [what, files]}<Pill tone={r.deleted ? "bad" : "accent"} title={files.join(", ")}>✎ {what}</Pill>{/each}
+      <!-- (WEB-04) -->
+      {#each noteGroups(r.notes ?? changeOf.get(r.id)?.notes ?? []) as [what, files]}
+        {#each files as file}
+          {#if onChanges && (scope.commit || view?.files?.find((f: any) => f.path === file)?.change === "deleted")}
+            <button type="button" class="note-link" aria-label="Show diff: {what}: {file}" onclick={() => showDiff(file)}><Pill tone={r.deleted ? "bad" : "accent"} title={file}>✎ {what}{files.length > 1 ? ` · ${file}` : ""}</Pill></button>
+          {:else if changes?.files?.find((f: any) => f.path === file)?.change === "deleted"}
+            <Pill tone={r.deleted ? "bad" : "accent"} title={file}>✎ {what}{files.length > 1 ? ` · ${file}` : ""}</Pill>
+          {:else}
+            <a href={u(what.startsWith("spec ") ? doc(file, r.id) : { tab: "code", path: file })} aria-label="{what}: {file}"><Pill tone={r.deleted ? "bad" : "accent"} title={file}>✎ {what}{files.length > 1 ? ` · ${file}` : ""}</Pill></a>
+          {/if}
+        {/each}
+      {/each}
     </div>
   {:else if r.line}<a href={u(doc(r.file, r.id))}>{r.file}:{r.line}</a>{:else}{r.file}{/if}
 {/snippet}
@@ -1107,7 +1126,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
         <table>
           <tbody>
             {#each view.files as f (f.path)}
-              <tr>
+              <tr id={`changed-file-${f.path}`}>
                 <td class="nowrap"><Pill tone={changeTone(f.change)}>{f.change}</Pill></td>
                 <td class="muted nowrap">{f.stage}</td>
                 <td class="muted nowrap">{f.kind}</td>
@@ -1292,6 +1311,8 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
   @media (max-width: 62rem) { .docs { flex-direction: column; } .tree { flex-basis: auto; max-height: 12rem; } }
   .badges { margin-top: 3px; }
   .notes { margin-top: 3px; font-size: var(--text-sm); line-height: 1.6; }
+  .note-link { all: unset; cursor: pointer; }
+  .note-link:focus-visible { outline: var(--focus-ring); }
   .txt { display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   /* a trace panel outside a split (overlap) is a floating card; inside one, Split draws the card */
   aside.float { position: sticky; top: 64px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px 14px; overflow: auto; max-height: calc(100vh - 80px); box-shadow: var(--shadow); }
@@ -1322,7 +1343,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
   :global(.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-built_in, .hljs-doctag) { color: var(--accent); }
   :global(.hljs-string, .hljs-regexp, .hljs-addition) { color: var(--ok); }
   :global(.hljs-number, .hljs-symbol, .hljs-bullet, .hljs-meta) { color: var(--warn); }
-  :global(.hljs-title, .hljs-section, .hljs-attr, .hljs-attribute) { color: var(--info); }
+  :global(.hljs-title, .hljs-section, .hljs-attr, .hljs-attribute, .hljs-name) { color: var(--info); }
   :global(.hljs-type, .hljs-class .hljs-title) { color: var(--accent-2); }
   :global(.hljs-deletion) { color: var(--bad); }
   .block { margin-bottom: 10px; }
