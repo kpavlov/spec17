@@ -82,7 +82,7 @@ release-build:
 
 dist: $(if $(filter darwin,$(OS)),sign,release-build)
 	@mkdir -p dist
-	tar -czf $(call archive,$(LABEL)) -C target/release spec17 -C $(CURDIR) LICENSE NOTICES
+	tar -czf $(call archive,$(LABEL)) -C target/release spec17 -C "$(CURDIR)" LICENSE NOTICES
 	@cd dist && f=$(notdir $(call archive,$(LABEL))) && { sha256sum $$f 2>/dev/null || shasum -a 256 $$f; } > $$f.sha256
 	@ls -la $(call archive,$(LABEL))*
 

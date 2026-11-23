@@ -287,7 +287,14 @@ impl Lang {
             let mut open = 0i64;
             let sig = (at..limit).find(|&i| { let code = self.strip.replace_all(&ls[i], " "); open += code.matches('(').count() as i64 - code.matches(')').count() as i64; open <= 0 }).unwrap_or(at);
             // a comment line never ends the body, but the comments and blank lines just before the end lie outside it
-            let mut end = (sig + 1..limit).find(|&i| { let t = ls[i].trim_start(); !t.is_empty() && !self.is_comment(t) && ls[i].len() - t.len() <= decl }).unwrap_or(limit);
+            // nor does a line inside a `"""`/`'''` string, or the one that closes it (shortcut: an odd count of fences flips the state)
+            let mut quoted = false;
+            let mut end = (sig + 1..limit).find(|&i| {
+                let inside = quoted;
+                quoted ^= (ls[i].matches("\"\"\"").count() + ls[i].matches("'''").count()) % 2 == 1;
+                let t = ls[i].trim_start();
+                !inside && !t.is_empty() && !self.is_comment(t) && ls[i].len() - t.len() <= decl
+            }).unwrap_or(limit);
             while end > sig + 1 && { let t = ls[end - 1].trim_start(); t.is_empty() || (self.is_comment(t) && ls[end - 1].len() - t.len() <= decl) } { end -= 1; }
             return Some(end);
         }
@@ -749,7 +756,8 @@ impl Project {
                     .find(|&i| lang.decl.is_match(&ls[i])).unwrap_or(m)
             };
             let indent = line.len() - line.trim_start().len();
-            let leading = ls[..m].iter().rev().take_while(|l| l.len() - l.trim_start().len() == indent && lang.attaches(l)).count();
+            // a declaration above (`@Test func a() {}`) is the previous test, not this one's header
+            let leading = ls[..m].iter().rev().take_while(|l| l.len() - l.trim_start().len() == indent && lang.attaches(l) && !lang.decl.is_match(l)).count();
             Some(Case { marker: m, decl, head: m - leading, end: ls.len() })
         }).collect();
         // markers that lead to one declaration (`@Test` above `func testX`) are one case

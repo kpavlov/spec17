@@ -495,6 +495,29 @@ fn a_python_body_runs_past_a_wrapped_signature_and_comments() {
 
 #[doc = "[SCAN-35]"]
 #[test]
+fn a_python_multiline_string_does_not_end_the_body() {
+    let d = scratch("python-multiline-string");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["py"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "tests/test_example.py", "# [DEM\x2D01]\ndef test_text():\n    x = \"\"\"\nflush left\n\"\"\"\n    assert x\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn a_one_line_test_above_is_not_the_next_tests_header() {
+    let d = scratch("swift-one-liners");
+    write(&d, "spec17.json", r#"{"tests":["Tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "Tests/ExampleTests.swift", "@Test func a() { #expect(true) } // [DEM\x2D01]\n@Test func b() { #expect(true) }\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!((cases[0].ids.len(), cases[1].ids.len()), (1, 0));
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
 fn a_brace_in_a_test_callbacks_parameters_is_not_its_body() {
     let d = scratch("ts-default-brace");
     write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["ts"]}"#);

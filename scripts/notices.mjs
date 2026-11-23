@@ -92,14 +92,14 @@ function permissive(expr) {
   const term = () => {
     const t = tokens[i++];
     if (t === "(") { const v = or(); i++; return v; }
-    return !!t && !COPYLEFT.test(t);
+    return !!t && t !== "UNLICENSED" && !COPYLEFT.test(t); // npm's UNLICENSED: proprietary, unlike the Unlicense
   };
   const and = () => { let v = term(); while (tokens[i] === "AND") { i++; v = term() && v; } return v; };
   const or = () => { let v = and(); while (tokens[i] === "OR") { i++; v = and() || v; } return v; };
   return or() && i === tokens.length; // leftovers: not an SPDX expression
 }
 for (const [a, b] of [["MIT OR Apache-2.0", true], ["(MIT OR Apache-2.0) AND Unicode-3.0", true], ["MIT/GPL-2.0", true],
-  ["GPL-3.0-only", false], ["MIT AND LGPL-2.1", false], ["see licence file", false]]) {
+  ["GPL-3.0-only", false], ["MIT AND LGPL-2.1", false], ["see licence file", false], ["UNLICENSED", false], ["Unlicense", true]]) {
   if (permissive(a) !== b) throw new Error(`permissive(${a}) should be ${b}`);
 }
 
