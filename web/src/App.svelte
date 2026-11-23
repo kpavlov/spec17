@@ -251,9 +251,9 @@
   $effect(() => {
     const id = route.id;
     void rows; // a refresh replaces the rows and must reload the open trace
-    if (!id) { trace = null; return; }
+    if (!id || inDocs) { trace = null; return; }
     // the previous trace stays (dimmed) until the new one lands, so the preview pane never collapses and reopens
-    call("trace", { id }).then((r) => { if (route.id === id) { trace = r; document.querySelector(".split .preview")?.scrollTo(0, 0); } }).catch((e) => { trace = null; error = e.message; });
+    call("trace", { id }).then((r) => { if (!inDocs && route.id === id) { trace = r; document.querySelector(".split .preview")?.scrollTo(0, 0); } }).catch((e) => { trace = null; error = e.message; });
   });
 
   // each selection takes a token (also when the file is already loaded), so a slower earlier response cannot replace it
@@ -262,7 +262,7 @@
     if (!inDocs) return;
     if (specFiles === null) { call("file").then((r) => (specFiles = r.data.files)).catch((e) => (error = e.message)); return; }
     const f = docFile, n = ++docReq;
-    if (f && f !== untrack(() => specLoaded)) call("file", { name: f }).then((r) => { if (n !== docReq) return; specLoaded = f; specMd = r.data.markdown; document.querySelector(".split .preview")?.scrollTo(0, 0); }).catch((e) => { if (n === docReq) error = e.message; });
+    if (f && f !== untrack(() => specLoaded)) call("file", { name: f }).then((r) => { if (n !== docReq) return; specLoaded = f; specMd = r.data.markdown; document.querySelector(".doc")?.scrollTo(0, 0); }).catch((e) => { if (n === docReq) error = e.message; });
   });
 
   $effect(() => {
@@ -539,12 +539,12 @@
   {:else if c}<span class="muted who" title={c.subject}>{c.author}, {c.date} · <span class="mono">{c.short}</span></span>{/if}
 {/snippet}
 
-{#snippet idlink(id: string, to: Route)}
-  <IdLink href={u(to)}>{id}</IdLink>
+{#snippet requirementLink(id: string, to: Route)}
+  <RequirementLink {id} href={u(to)} getText={requirementText} />
 {/snippet}
 
 {#snippet reqRef(id: string, to: Route)}
-  {@render idlink(id, to)}{#if byId.get(id)}{" "}<RequirementBadges level={byId.get(id)!.level} state={byId.get(id)!.state} />{/if}
+  {@render requirementLink(id, to)}{#if byId.get(id)}{" "}<RequirementBadges level={byId.get(id)!.level} state={byId.get(id)!.state} />{/if}
 {/snippet}
 
 {#snippet th(label: string, key: string, st: Sort, cls = "")}
@@ -855,7 +855,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
     {#snippet ids(title: string, list: string[], sev: Tone)}
       {#if list.length}
         <Section {title} count={list.length} tone={sev}>
-          <p class="ids">{#each list as id}{@render idlink(id, req(id))}{/each}</p>
+          <p class="ids">{#each list as id}{@render requirementLink(id, req(id))}{/each}</p>
         </Section>
       {/if}
     {/snippet}
@@ -872,7 +872,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
       <Section title="Invalid tests" count={invalidN} tone="bad">
         <p class="muted"><a href="{docs}/specs/#tests-and-citations" target="_blank" rel="noopener noreferrer">What these mean</a></p>
         {#each Object.entries(report.invalid_tests) as [kind, list]}
-          {#if (list as any[]).length}<p><code>{kind}</code> {#each list as any[] as p}{@render idlink(p.id, req(p.id))} <a class="muted mono" href={u({ tab: "code", path: p.file, line: p.line })}>{p.file}:{p.line}</a> {/each}</p>{/if}
+          {#if (list as any[]).length}<p><code>{kind}</code> {#each list as any[] as p}{@render requirementLink(p.id, req(p.id))} <a class="muted mono" href={u({ tab: "code", path: p.file, line: p.line })}>{p.file}:{p.line}</a> {/each}</p>{/if}
         {/each}
       </Section>
     {/if}
@@ -897,21 +897,12 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
           {@render viewSeg()}
           <button type="button" class="filter-toggle" aria-pressed={treeOpen} title="Show or hide the document tree" onclick={toggleTree}>Files</button>
           {#if showChanged}<Seg label="Changes" options={changedSeg(specFiles.filter((x) => fileOf.has(x)).length)} value={onlyChanged ? "changed" : "all"} onpick={pickChanged} />{/if}
-          <span class="grow"></span>
-          <SplitToggle />
         </div>
         <div class="docs">
           {#if treeOpen}<aside class="tree"><FileTree files={docFiles} selected={f} href={(d) => u(doc(d, undefined, route.changed))} mark={changeMark} /></aside>{/if}
-          <div class="docbody">
-            <Split name="docs" def={60}>
-              {#snippet list()}
-                <div class="doc">
-                  {#if fileOf.has(f)}<p><ViewSwitch /></p>{/if}
-                  {#if diffOn(fileOf.has(f))}<DiffView paths={[f]} {gen} />{:else}<article><Markdown source={specMd} mark={(id) => (known.has(id) ? edgeTone(byId.get(id)!.state) : undefined)} /></article>{/if}
-                </div>
-              {/snippet}
-              {#snippet preview()}{@render tracePanel()}{/snippet}
-            </Split>
+          <div class="doc">
+            {#if fileOf.has(f)}<p><ViewSwitch /></p>{/if}
+            {#if diffOn(fileOf.has(f))}<DiffView paths={[f]} {gen} />{:else}<article><Markdown source={specMd} mark={(id) => (known.has(id) ? edgeTone(byId.get(id)!.state) : undefined)} /></article>{/if}
           </div>
         </div>
       </div>
@@ -1053,7 +1044,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
             {#snippet cell(c, k)}
               {#if k === "name"}<span class="mono" title={c.t.qualified}>{c.t.name}</span>{#if changeMark(c.file)}{" "}<Pill tone={changeTone(changeMark(c.file))} title="its file is {changeMark(c.file)} in the working tree">✎ {changeMark(c.file)}</Pill>{/if}
               {:else if k === "file"}<a href={u({ tab: "code", path: c.file, line: c.t.line })}>{c.file}:{c.t.line}</a>
-              {:else}<div class="test-links">{#each c.t.ids as id}<RequirementLink {id} href={u(known.has(id) ? req(id) : { tab: "requirements", q: id })} getText={requirementText} />{/each}{#if !c.t.ids.length}<span class="muted">untagged</span>{/if}</div>{/if}
+              {:else}<div class="test-links">{#each c.t.ids as id}{@render requirementLink(id, known.has(id) ? req(id) : { tab: "requirements", q: id })}{/each}{#if !c.t.ids.length}<span class="muted">untagged</span>{/if}</div>{/if}
             {/snippet}
             {#snippet empty()}<p class="muted empty">No test matches. <a href="/tests">Clear filters</a></p>{/snippet}
           </DataTable>
@@ -1294,10 +1285,9 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
   .refs a, li a { text-decoration: none; }
   .refs a:hover, li a:hover { text-decoration: underline; }
   .page { display: flex; flex-direction: column; height: calc(100dvh - 100px); min-height: 440px; }
-  .doc { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px 14px; box-shadow: var(--shadow); }
+  .doc { flex: 1; min-width: 0; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px 14px; box-shadow: var(--shadow); }
   .docs { display: flex; flex: 1; min-height: 0; gap: var(--gap); }
   .tree { flex: 0 0 15rem; min-height: 0; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-  .docbody { flex: 1; min-width: 0; display: flex; flex-direction: column; }
   .filter-toggle[aria-pressed=true] { background: var(--tint-on); color: var(--accent); }
   @media (max-width: 62rem) { .docs { flex-direction: column; } .tree { flex-basis: auto; max-height: 12rem; } }
   .badges { margin-top: 3px; }

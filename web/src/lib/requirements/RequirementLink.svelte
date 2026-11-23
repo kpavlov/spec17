@@ -55,8 +55,9 @@
   <IdLink {href} describedby={tipId}>{id}</IdLink>
 </span>
 <!-- svelte-ignore a11y_no_static_element_interactions -->
-<span bind:this={tip} id={tipId} popover="manual" role="tooltip" onpointerenter={() => clearTimeout(timer)} onpointerleave={leave}>{text}</span>
+<span bind:this={tip} id={tipId} popover="manual" role="tooltip" onpointerenter={() => clearTimeout(timer)} onpointerleave={leave}><span class="preview">{text}</span></span>
 
 <style>
+  .preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; overflow-wrap: anywhere; }
   [popover] { position: fixed; inset: auto; margin: 0; max-width: min(24rem, calc(100vw - 16px)); white-space: normal; padding: 6px 10px; background: var(--tooltip-bg); color: var(--fg); border: 1px solid var(--muted); border-radius: var(--radius); font: var(--text-sm)/1.5 system-ui, sans-serif; }
 </style>
