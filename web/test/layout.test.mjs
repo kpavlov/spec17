@@ -13,6 +13,18 @@ test("reduces crossings without changing the set of node positions", () => {
   assert.ok(side(a, b, c) * side(a, b, d) >= 0 || side(c, d, a) * side(c, d, b) >= 0);
 });
 
+// [WEB-48] A swap that would make nodes of different sizes overlap is not made.
+test("skips a swap that would overlap nodes", () => {
+  // the big node fits only where it is: next to C's or D's place sits another node, so the crossing goes by swapping small ones
+  const nodes = [{ x: 0, y: 0, r: 1.4 }, { x: 4, y: 4, r: 0.05 }, { x: 0, y: 4, r: 0.05 }, { x: 4, y: 0, r: 0.05 }, { x: 0, y: 5.3, r: 0.05 }, { x: 5.3, y: 0, r: 0.05 }];
+  reduceCrossings(nodes, [{ source: nodes[0], target: nodes[1] }, { source: nodes[2], target: nodes[3] }], (n) => n.r);
+  assert.deepEqual([nodes[0].x, nodes[0].y], [0, 0]);
+  for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) {
+    const [a, b] = [nodes[i], nodes[j]];
+    assert.ok(Math.hypot(a.x - b.x, a.y - b.y) >= a.r + b.r, `${i},${j}`);
+  }
+});
+
 // [WEB-50] Direction does not split a cluster; disconnected nodes keep their own space.
 test("groups linked nodes and separates the clusters with forces", () => {
   const nodes = [{ x: 0, y: 0, r: 5 }, { x: 20, y: 0, r: 5 }, { x: 0, y: 0, r: 5 }, { x: 0, y: 0, r: 5 }];

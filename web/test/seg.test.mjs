@@ -67,7 +67,8 @@ test("a single-choice group is a radio group with one tab stop", () => {
   assert.ok(buttons.every((b) => b.attr.role === "radio" && b.attr["aria-pressed"] === undefined && !b.check));
   assert.deepEqual(buttons.map((b) => b.attr["aria-checked"]), ["false", "false", "true", "false"]);
   assert.deepEqual(buttons.map((b) => b.attr.tabindex), ["-1", "-1", "0", "-1"]);
-  assert.deepEqual(seg({ options, value: "nothing here" }).buttons.map((b) => b.attr.tabindex), ["-1", "-1", "-1", "-1"]);
+  // nothing checked: the first option is the tab stop, so the group stays reachable
+  assert.deepEqual(seg({ options, value: "nothing here" }).buttons.map((b) => b.attr.tabindex), ["0", "-1", "-1", "-1"]);
 });
 
 // Selecting turns the label bold: an invisible bold copy of it (the data-text) keeps the button from changing width.

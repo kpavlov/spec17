@@ -7,6 +7,8 @@
   // Single-choice groups select with arrows. Multi-choice groups use toggle buttons; a click with Shift, Ctrl or ⌘ held says `additive`.
   let { label, keycap, hint, options, value, selected, nowrap = false, onpick }: { label: string; keycap?: string; hint?: string; options: Opt[]; value?: string; selected?: string[]; nowrap?: boolean; onpick: (key: string, additive?: boolean) => void } = $props();
   const picked = (key: string) => selected ? selected.includes(key) : value === key;
+  // a radio group with no checked option still needs one tab stop: the first
+  const stop = (i: number) => picked(options[i].key) || (i === 0 && !options.some((o) => o.key === value));
   let bar = $state<HTMLElement>();
 
   function arrow(e: KeyboardEvent) {
@@ -20,8 +22,8 @@
 
 <div class="seg" class:nowrap role={selected ? "group" : "radiogroup"} aria-label={label} title={hint} bind:this={bar}>
   <span class="name" aria-hidden="true">{label}{#if keycap}{" "}<kbd>{keycap}</kbd>{/if}</span>
-  {#each options as o (o.key)}
-    <button type="button" role={selected ? undefined : "radio"} class:zero={o.count === 0 && !picked(o.key)} aria-pressed={selected ? picked(o.key) : undefined} aria-checked={selected ? undefined : picked(o.key)} tabindex={selected || picked(o.key) ? 0 : -1} title={o.title} onclick={(e) => onpick(o.key, additive(e))} onkeydown={arrow}>{#if selected}<span class="check" aria-hidden="true">✓</span>{/if}{#if o.tone}<i class="dot" data-tone={o.tone}></i>{/if}<span class="text" data-text={o.label}>{o.label}</span>{#if o.count !== undefined}{" "}<b>{o.count}</b>{/if}</button>
+  {#each options as o, i (o.key)}
+    <button type="button" role={selected ? undefined : "radio"} class:zero={o.count === 0 && !picked(o.key)} aria-pressed={selected ? picked(o.key) : undefined} aria-checked={selected ? undefined : picked(o.key)} tabindex={selected || stop(i) ? 0 : -1} title={o.title} onclick={(e) => onpick(o.key, additive(e))} onkeydown={arrow}>{#if selected}<span class="check" aria-hidden="true">✓</span>{/if}{#if o.tone}<i class="dot" data-tone={o.tone}></i>{/if}<span class="text" data-text={o.label}>{o.label}</span>{#if o.count !== undefined}{" "}<b>{o.count}</b>{/if}</button>
   {/each}
 </div>
 

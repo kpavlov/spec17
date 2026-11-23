@@ -70,8 +70,9 @@ function crosses(a: Point, b: Point, c: Point, d: Point): boolean {
   return side(a, b, c) * side(a, b, d) < 0 && side(c, d, a) * side(c, d, b) < 0;
 }
 
-// (WEB-48) Swapping positions preserves the simulation's spacing while removing crossings.
-export function reduceCrossings<T extends Point>(nodes: T[], edges: Edge<T>[]): void {
+// (WEB-48) Swapping positions removes crossings. Nodes of different sizes may not fit each other's place, so a swap that would bring
+// either node closer to another than the sum of their `radius` is skipped (a and b keep their distance and radii).
+export function reduceCrossings<T extends Point>(nodes: T[], edges: Edge<T>[], radius: (node: T) => number = () => 0): void {
   // shortcut: bound quadratic crossing checks for dense graphs, revisit with a scalable layout algorithm
   if (nodes.length > 100 || edges.length > 120) return;
   const incident = new Map(nodes.map((node) => [node, [] as number[]]));
@@ -100,7 +101,8 @@ export function reduceCrossings<T extends Point>(nodes: T[], edges: Edge<T>[]): 
       const before = count();
       [a.x, b.x] = [b.x, a.x];
       [a.y, b.y] = [b.y, a.y];
-      const after = count();
+      const clear = (n: T) => nodes.every((c) => c === a || c === b || Math.hypot(n.x - c.x, n.y - c.y) >= radius(n) + radius(c));
+      const after = clear(a) && clear(b) ? count() : before;
       if (after < before) { total += after - before; improved = true; }
       else { [a.x, b.x] = [b.x, a.x]; [a.y, b.y] = [b.y, a.y]; }
     }

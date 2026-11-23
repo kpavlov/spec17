@@ -12,7 +12,7 @@
 - Use the same filter toolbar on the Tests page, and hide its preview until a test is selected.
 - Link requirement notes on Changes to the file's diff, and show longer requirement previews.
 - Configure test detection in language profiles instead of code. **Breaking:** a `spec17.json` profile that relied on `@` lines attaching to a test must now set `annotation`.
-- Use CodeGraph data only while it matches the current files, so the same tree gives the same output.
+- Read test ranges and names from CodeGraph only while the index holds the file's current content.
 - Scan large test suites faster.
 
 ## 0.2.0

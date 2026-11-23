@@ -74,7 +74,8 @@ fn priority_and_effort_metadata() {
 - **DEM-13** MUST — speak HTTP/2 and P2P (P2P) [P2x].\n\
 - **DEM-14** MUST — a hint in code: `[P1]` `(effort: M)` `[M]`.\n\
 - **DEM-15** MUST — call f(P1) and x[M].\n\
-- **DEM-16** SHOULD — fit the layout. [P2] [M] (manual)\n");
+- **DEM-16** SHOULD — fit the layout. [P2] [M] (manual)\n\
+- **DEM-17** MUST — mismatched [P2) (M] brackets.\n");
     let a = Analysis::load(Some(&d)).unwrap();
     let one = &a.s["DEM-01"];
     assert_eq!((one.priority.as_deref(), one.effort.as_deref(), one.mark.as_str()), (Some("P12"), Some("XL"), "manual"));
@@ -89,7 +90,7 @@ fn priority_and_effort_metadata() {
     assert_eq!((a.s["DEM-08"].priority.as_deref(), a.s["DEM-08"].effort.as_deref()), (Some("P1"), Some("5 points")));
     assert_eq!(a.s["DEM-09"].effort.as_deref(), Some("M"));
     assert_eq!(a.s["DEM-10"].effort.as_deref(), Some("XL"));
-    for id in ["DEM-11", "DEM-12", "DEM-13", "DEM-14", "DEM-15"] {
+    for id in ["DEM-11", "DEM-12", "DEM-13", "DEM-14", "DEM-15", "DEM-17"] {
         assert_eq!((a.s[id].priority.as_deref(), a.s[id].effort.as_deref()), (None, None), "{id}");
     }
     let last = &a.s["DEM-16"];
@@ -449,11 +450,57 @@ fn a_body_that_never_balances_ends_at_the_next_tests_header() {
     write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["rb"]}"#);
     write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
     // the `unless` of the first test is never closed, so its nesting never returns to 0
-    write(&d, "tests/example_spec.rb", "it 'first' do\n  unless foo\n  # [DEM\x2D01]\n  expect(true)\nend\n\n# a note\nit 'second' do\n  # [DEM\x2D02]\n  expect(true)\nend\n");
+    write(&d, "tests/example_spec.rb", "it 'first' do\n  unless foo\n  # [DEM\x2D01]\nend\n\n# a note\nit 'second' do\n  # [DEM\x2D02]\n  expect(true)\nend\n");
     let a = Analysis::load(Some(&d)).unwrap();
     let cases = &a.tests_view().modules[0].files[0].tests;
     assert_eq!((cases[0].ids.clone(), cases[1].ids.clone()), (vec!["DEM-01".to_string()], vec!["DEM-02".to_string()]));
     assert!(a.report().invalid_tests["comment-only"].is_empty());
+    // the first body stops before the second test's assertion
+    assert_eq!(a.report().invalid_tests["no-assert"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-01"]);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn a_ruby_case_expression_closes_its_own_end() {
+    let d = scratch("ruby-case-expr");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["rb"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "tests/example_spec.rb", "# [DEM\x2D01]\nit 'maps' do\n  y = case z\n  when 1 then 2\n  end\n  expect(y).to eq(2)\nend\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn markers_of_one_declaration_are_one_test() {
+    let d = scratch("swift-two-markers");
+    write(&d, "spec17.json", r#"{"tests":["Tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "Tests/ExampleTests.swift", "// [DEM\x2D01]\n@Test\n@MainActor\nfunc testOne() { #expect(true) }\n\n@Test func testTwo() { #expect(true) }\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let names: Vec<_> = a.tests_view().modules[0].files[0].tests.iter().map(|t| t.name.clone()).collect();
+    assert_eq!(names, ["testOne", "testTwo"]);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn a_python_body_runs_past_a_wrapped_signature_and_comments() {
+    let d = scratch("python-wrapped-def");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["py"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "tests/test_example.py", "# [DEM\x2D01]\ndef test_wrapped(\n    a,\n):\n    x = a\n# a note\n    assert x\n\nvalue = 1\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn a_brace_in_a_test_callbacks_parameters_is_not_its_body() {
+    let d = scratch("ts-default-brace");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["ts"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "tests/a.test.ts", "// [DEM\x2D01]\nit(\"works\", (ctx = {}) => {\n  const x = 1;\n  expect(x).toBe(1);\n});\n");
+    let a = Analysis::load(Some(&d)).unwrap();
     assert!(a.report().invalid_tests["no-assert"].is_empty());
 }
 

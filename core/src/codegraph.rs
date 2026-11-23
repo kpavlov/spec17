@@ -54,9 +54,11 @@ pub struct Graph {
     pub version: Option<i64>,
 }
 
-const NEEDED: [(&str, &[&str]); 2] = [
+const NEEDED: [(&str, &[&str]); 3] = [
     ("nodes", &["id", "kind", "name", "qualified_name", "file_path", "start_line", "end_line", "visibility"]),
     ("edges", &["source", "target", "kind"]),
+    // (SCAN-35) without the hash, no range can be trusted to match the file
+    ("files", &["path", "content_hash"]),
 ];
 
 impl Graph {

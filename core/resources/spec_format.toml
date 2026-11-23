@@ -29,13 +29,15 @@ done = '[✅✔☑✳]\x{FE0F}?'
 priority = [
     '(?i)(?:^|\s)[\[(]priority:\s*(P[0-9]+)[\])]',
     # case-sensitive and bracketed: p95 latency, (p95) and P2P are prose, not hints
-    '(?:^|\s)[\[(](P[0-9]+)[\])]',
+    '(?:^|\s)\[(P[0-9]+)\]',
+    '(?:^|\s)\((P[0-9]+)\)',
 ]
 effort = [
     '(?i)(?:^|\s)\((?:effort|size|estimate):\s*([^()\[\]]+?)\s*\)',
     '(?i)(?:^|\s)\[(?:effort|size|estimate):\s*([^()\[\]]+?)\s*\]',
     # upper case and after whitespace: requirement(s), file(s) and a code-quoted `[M]` are not sizes
-    '(?:^|\s)[\[(](XXXS|XXS|XS|S|M|L|XL|XXL|XXXL)[\])]',
+    '(?:^|\s)\[(XXXS|XXS|XS|S|M|L|XL|XXL|XXXL)\]',
+    '(?:^|\s)\((XXXS|XXS|XS|S|M|L|XL|XXL|XXXL)\)',
 ]
 line = ['(?:[-*+]|\d+[.)])\s+', '\|\s*']
 block = ['#{1,6}\s+Requirement:\s*', '#{1,6}\s+', '\*\*']

@@ -127,8 +127,9 @@ off = '\bskip\b|\bxit\b|\bxdescribe\b|\bpending\b'
 test = '(^|/)(spec|test)/|_(spec|test)\.rb$'
 case = '^\s*(?:(?:it|specify|scenario)\s*[(\x22\x27]|def\s+test_)'
 call = true
-# a statement keyword opens a level only at the start of a line (`x = 1 if y` does not); `do` anywhere, once per `while ... do`
-block_open = '^\s*(?:(?:while|until|for)\b(?:.*?\bdo\b)?|(?:def|if|unless|case|begin|class|module)\b)|\bdo\b'
+# a statement keyword opens a level at the start of a line; `if`, `unless`, `case`, `begin` also after `=`, `(`, `&&`, `||`
+# (`x = case y`), never as a modifier (`x = 1 if y`) or a keyword argument (`if:`); `do` anywhere, once per `while ... do`
+block_open = '^\s*(?:(?:while|until|for)\b(?:.*?\bdo\b)?|(?:def|class|module)\b)|(?:^|[=(]|&&|\|\|)\s*(?:if|unless|case|begin)(?:[^\w:]|$)|\bdo\b'
 block_close = '\bend\b'
 
 [[profile]]

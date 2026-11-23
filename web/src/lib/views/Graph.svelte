@@ -83,7 +83,7 @@
           .force("x", forceX(0).strength(0.12)).force("y", forceY(0).strength(0.12))
           .force("group", group ? prefixForce<N>((n) => [group(n.id)]) : null) // (WEB-53)
           .force("collide", forceCollide<N>((n) => n.r + 12).strength(1).iterations(3)).stop().tick(200);
-        if (group) reduceCrossings(cluster, edgesByCluster[i]); // (WEB-48)
+        if (group) reduceCrossings(cluster, edgesByCluster[i], (n) => n.r + 12); // (WEB-48) the collide radius: atoms never overlap
       }
       centers = new Map([...separate(clusters, 60, group && ((n: N) => group(n.id)))].map(([n, center]) => [n.id, center]));
     }
