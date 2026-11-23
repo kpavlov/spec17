@@ -11,7 +11,7 @@
   import { MediaQuery } from "svelte/reactivity";
   import { levelPills } from "$lib/requirements/levelPills";
   import RequirementBadges from "$lib/requirements/RequirementBadges.svelte";
-  import { metadataKey, metadataValue } from "$lib/requirements/metadata";
+  import { readValues, writeValues, toggleValue, matches, type Value } from "$lib/requirements/filters";
   import Filters from "$lib/ui/Filters.svelte";
   import Seg from "$lib/ui/Seg.svelte";
   import FileTree from "$lib/ui/FileTree.svelte";
@@ -101,20 +101,29 @@
   $effect(() => {
     const onkey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
+      if (e.key === "Escape" && reqFiltersOpen && t.closest(".req-options")) { setReqFiltersOpen(false); document.querySelector<HTMLButtonElement>(".filter-toggle")?.focus(); return; }
       if (t.closest("input, select, textarea, .gutter, .seg") || e.metaKey || e.ctrlKey || e.altKey) { if (e.key === "Escape") (t as HTMLElement).blur(); return; }
       if (e.key === "/") {
         e.preventDefault();
         if (inDocs || (route.tab !== "requirements" && route.tab !== "changes")) navigate({ tab: "requirements" });
         queueMicrotask(() => document.querySelector<HTMLInputElement>("input[name=filter]")?.focus());
-      } else if ((route.tab === "requirements" || route.tab === "changes") && /^[0-7sl]$/i.test(e.key)) {
-        // filter shortcuts: 1-7 pick a state, S/L step through states/levels (⇧ goes back), 0 clears every filter
-        const k = e.key.toLowerCase(), d = e.shiftKey ? -1 : 1;
-        const step = (keys: string[], cur: string) => keys[(keys.indexOf(cur) + d + keys.length) % keys.length];
-        if (k === "0") filter(clearReqFilters);
-        else if (k === "s") filter({ state: step(stateKeys, stateFilter) });
-        else if (k === "l") { const n = step(levelKeys, levelFilter || "all"); filter({ level: n === "all" ? undefined : n }); }
-        else if (stateKeys.includes(states[+k - 1])) filter({ state: states[+k - 1] });
-      } else if (e.key === "Escape" && route.id && (route.tab === "requirements" || route.tab === "overlap")) navigate({ ...route, id: undefined });
+      } else if ((route.tab === "requirements" || route.tab === "changes") && e.key.toLowerCase() === "f") {
+        e.preventDefault(); setReqFiltersOpen(true); tick().then(() => document.querySelector<HTMLInputElement>(".req-options button")?.focus());
+      } else if (document.querySelector(".req-toolbar .filter-toggle") && /^[0-7slpecr]$/i.test(e.key)) {
+        const k = e.key.toLowerCase();
+        const field = facets.find((key) => facetShortcuts[key].toLowerCase() === k);
+        if (k === "0") navigate({ ...route, ...clearReqFilters });
+        else if (field) {
+          const choices = options(field);
+          if (choices.length === 1) return;
+          const values = selected(field);
+          const index = values.length ? choices.findIndex((choice) => choice.key === JSON.stringify(values[0])) : 0;
+          const next = choices[(index + (e.shiftKey ? -1 : 1) + choices.length) % choices.length];
+          navigate({ ...route, [field]: next.key ? writeValues([JSON.parse(next.key)]) : undefined });
+        }
+        else if (stateKeys.includes(states[+k - 1])) navigate({ ...route, state: states[+k - 1] === "all" ? undefined : states[+k - 1] });
+      } else if (e.key === "Escape" && reqFiltersOpen && (route.tab === "requirements" || route.tab === "changes")) setReqFiltersOpen(false);
+      else if (e.key === "Escape" && route.id && (route.tab === "requirements" || route.tab === "overlap")) navigate({ ...route, id: undefined });
       else if (e.key === "Escape" && route.path && route.tab === "tests") navigate({ ...route, path: undefined, line: undefined });
     };
     document.addEventListener("keydown", onkey);
@@ -359,7 +368,6 @@
   const onlyChanged = $derived(route.changed === "1");
   // (WEB-35) reviewed = its commit is the one it was reviewed at; committed again since, it is unreviewed again
   const isReviewed = (id: string) => !!commits[id] && reviewed[id] === commits[id].sha;
-  const onlyUnreviewed = $derived(route.reviewed === "0");
   const reviewTip = (id: string) => (isReviewed(id) ? `reviewed at ${commits[id].short}` : reviewed[id] ? `changed since reviewed (${reviewed[id].slice(0, 7)} → ${commits[id].short})` : "mark reviewed");
   // (WEB-36) who last changed the line of a test: asked per file when a preview shows it; keyed by reload (gen), so a reload asks again
   let blame = $state<Record<string, any>>({});
@@ -379,40 +387,54 @@
   const stateFilter = $derived(route.state ?? "all");
   const query = $derived(route.q ?? "");
   const levels = ["MUST", "SHOULD", "MAY"];
-  const levelFilter = $derived(route.level ?? "");
-  const priorityFilter = $derived(route.priority ?? "");
-  const effortFilter = $derived(route.effort ?? "");
   const onChanges = $derived(route.tab === "changes");
   // (WEB-57) change records include their own metadata, even when the status list is truncated
   const reqFilterRows = $derived<Row[]>(onChanges ? view?.requirements ?? [] : rows);
   const clearReqFilters = { state: undefined, level: undefined, priority: undefined, effort: undefined, q: undefined, changed: undefined, reviewed: undefined };
-  let reqFiltersOpen = $state(stored("spec17.requirementFilters") === "1"); // (WEB-58)
-  // SHALL and reference docs have no chip of their own: they group under "other"
-  const levelOf = (r: Row) => (levels.includes(r.level) ? r.level : "other");
-  // the rows that pass every filter except the one named: what a chip of that filter would show
-  const facet = (skip?: "state" | "level" | "priority" | "effort") => reqFilterRows.filter((r) => (skip === "state" || stateFilter === "all" || r.state === stateFilter) && (skip === "level" || !levelFilter || levelOf(r) === levelFilter) && (skip === "priority" || !priorityFilter || r.priority === priorityFilter) && (skip === "effort" || !effortFilter || r.effort === effortFilter) && (onChanges || !onlyChanged || reqKinds.has(r.id)) && (!onlyUnreviewed || !isReviewed(r.id)) && (!query || `${r.id} ${r.text} ${r.file}`.toLowerCase().includes(query.toLowerCase())));
-  const tally = (list: Row[], key: (r: Row) => string) => list.reduce<Record<string, number>>((m, r) => ((m[key(r)] = (m[key(r)] ?? 0) + 1), m), Object.create(null));
+  let reqFiltersOpen = $state(stored("spec17.requirementFilters") !== "0"); // (WEB-58)
+  // (WEB-59) each facet ignores its own selection when counting choices.
+  type Facet = "state" | "level" | "priority" | "effort" | "changed" | "reviewed";
+  const facets: Facet[] = ["state", "level", "priority", "effort", "changed", "reviewed"];
+  const facetLabels: Record<Facet, string> = { state: "State", level: "Level", priority: "Priority", effort: "Effort", changed: "Changes", reviewed: "Reviewed" };
+  const facetShortcuts: Record<Facet, string> = { state: "S", level: "L", priority: "P", effort: "E", changed: "C", reviewed: "R" };
+  const setReqFiltersOpen = (open: boolean) => { reqFiltersOpen = open; save("spec17.requirementFilters", open ? "1" : "0"); };
+  const selected = (key: Facet) => key === "state" && route.state === "all" ? [] : readValues(route[key]);
+  const levelOf = (r: Row) => levels.includes(r.level) ? r.level : "other";
+  const facetValue = (r: Row, key: Facet): Value => key === "level" ? levelOf(r) : key === "changed" ? (onChanges ? isDirect(r) : reqKinds.has(r.id)) ? "1" : "0" : key === "reviewed" ? isReviewed(r.id) ? "1" : "0" : r[key] ?? null;
+  const facet = (skip?: Facet) => reqFilterRows.filter((r) => facets.every((key) => key === skip || matches(selected(key), facetValue(r, key))) && (!query || `${r.id} ${r.text} ${r.file}`.toLowerCase().includes(query.toLowerCase())));
   const shown = $derived(facet());
-  const stateN = $derived.by(() => { const l = facet("state"); return { ...tally(l, (r) => r.state), all: l.length } as Record<string, number>; });
-  const levelN = $derived.by(() => { const l = facet("level"); return { ...tally(l, levelOf), all: l.length } as Record<string, number>; });
-  const metadataOpts = (key: "priority" | "effort", selected: string, tone: (value: string) => Tone) => {
-    const values = [...new Set([...reqFilterRows.map((r) => r[key]).filter((v): v is string => !!v), ...(selected ? [selected] : [])])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
-    const list = facet(key), counts = tally(list, (r) => r[key] ?? "");
-    return [{ key: "all", label: "all", count: list.length }, ...values.map((v) => ({ key: metadataKey(v), label: v, count: counts[v] ?? 0, tone: tone(v) }))];
-  };
-  const presentStates = $derived(new Set(reqFilterRows.map((r) => r.state)));
-  const presentLevels = $derived(new Set(reqFilterRows.map(levelOf)));
-  const stateKeys = $derived(states.filter((st) => st === "all" || st === stateFilter || presentStates.has(st)));
-  const levelKeys = $derived(["all", ...[...levels, "other"].filter((lv) => lv === levelFilter || presentLevels.has(lv))]);
-  const activeReqFilters = $derived([stateFilter !== "all", levelFilter, priorityFilter, effortFilter, !onChanges && onlyChanged, onlyUnreviewed].filter(Boolean).length);
+  const stateKeys = $derived(states.filter((st) => st === "all" || selected("state").includes(st) || reqFilterRows.some((r) => r.state === st)));
+  const activeReqFilters = $derived(facets.filter((key) => selected(key).length).length);
   const filtering = $derived(!!activeReqFilters || !!query);
-  // a "changed only" switch with its count; shown once something changed (or while it is on, so it can be turned off)
   const changedSeg = (n: number) => [{ key: "all", label: "all" }, { key: "changed", label: "changed", count: n }];
   const showChanged = $derived(!!changes?.files.length || onlyChanged);
-  const pickReviewed = (k: string) => filter({ reviewed: k === "unreviewed" ? "0" : undefined });
   const pickChanged = (k: string) => filter({ changed: k === "changed" ? "1" : undefined });
-  const stateOpts = $derived(stateKeys.map((st) => ({ key: st, label: stateLabel(st), count: stateN[st] ?? 0, tone: st === "all" ? undefined : stateTone[st], title: `${STATE_HINT[st]} (${states.indexOf(st) + 1})` })));
-  const levelOpts = $derived(levelKeys.map((l) => ({ key: l, label: l.toLowerCase(), tone: requirementLevelTone[l.toUpperCase()], count: levelN[l] ?? 0 })));
+  const optionLabel = (key: Facet, v: Value) => v === null ? "Not set" : key === "state" ? stateLabel(v) : key === "level" ? v.toLowerCase() : key === "changed" ? onChanges ? v === "1" ? "directly changed" : "reached through tests" : v === "1" ? "changed" : "unchanged" : key === "reviewed" ? v === "1" ? "reviewed" : "unreviewed" : v;
+  const optionTone = (key: Facet, value: Value) => value === null ? undefined : key === "state" ? stateTone[value] : key === "level" ? requirementLevelTone[value.toUpperCase()] : key === "priority" ? priorityTone(value) : key === "effort" ? effortTone(value) : undefined;
+  const options = (key: Facet) => {
+    const present = new Set(reqFilterRows.map((row) => facetValue(row, key)));
+    const order = key === "state" ? states.slice(1) : key === "level" ? [...levels, "other"] : ["1", "0"];
+    const values = [...new Set([...present, ...selected(key)])];
+    values.sort((a, b) => {
+      if (a === null) return 1;
+      if (b === null) return -1;
+      if (key !== "effort" && key !== "priority") {
+        const rank = (value: string) => order.includes(value) ? order.indexOf(value) : order.length;
+        return rank(a) - rank(b);
+      }
+      return a.localeCompare(b, undefined, { numeric: true });
+    });
+    const eligible = facet(key);
+    const counts = new Map<Value, number>();
+    for (const row of eligible) {
+      const value = facetValue(row, key);
+      counts.set(value, (counts.get(value) ?? 0) + 1);
+    }
+    return [{ key: "", label: "All", count: eligible.length }, ...values.map((value) => ({ key: JSON.stringify(value), label: optionLabel(key, value), count: counts.get(value) ?? 0, tone: optionTone(key, value), title: key === "state" && value ? STATE_HINT[value] : undefined }))];
+  };
+  const pickFacet = (key: Facet, value: Value) => navigate({ ...route, [key]: writeValues(toggleValue(selected(key), value)) });
+  const clearFacet = (key: Facet) => navigate({ ...route, [key]: undefined });
+  const editFacet = (key: Facet) => { setReqFiltersOpen(true); tick().then(() => document.querySelector<HTMLButtonElement>(`[data-facet="${key}"] button[aria-pressed=true]`)?.focus()); };
   // the modules table sorts here; the requirement, test and spec lists sort inside DataTable
   let modSort = $state<Sort>({ key: "", dir: 1 });
   const reqVal = (r: Row, k: string) => (k === "file" ? `${r.file}:${String(r.line).padStart(6, "0")}` : (r as any)[k]);
@@ -522,25 +544,46 @@
 {/snippet}
 
 {#snippet requirementToolbar()}
-  <!-- (WEB-33, WEB-43) -->
+  <!-- (WEB-33, WEB-43, WEB-59) -->
   <div class="bar req-toolbar">
-    <input name="filter" aria-label={onChanges ? "Filter affected requirements" : "Filter requirements"} placeholder="Filter requirements" title="Filter by ID, text or file (/)" value={query} oninput={(e) => filter({ q: e.currentTarget.value })} />
-    <button type="button" class="filter-toggle" aria-expanded={reqFiltersOpen} aria-controls="requirement-filter-options" onclick={() => { reqFiltersOpen = !reqFiltersOpen; save("spec17.requirementFilters", reqFiltersOpen ? "1" : "0"); }}>
-      Filters{activeReqFilters ? ` (${activeReqFilters})` : ""}<span class="chevron" aria-hidden="true"></span>
-    </button>
-    <span class="found muted nowrap" aria-live="polite">{#if filtering}{shown.length} of {reqFilterRows.length}{/if}</span>
+    <input name="filter" aria-label={onChanges ? "Search affected requirements" : "Search requirements"} placeholder="Search requirements…" title="Search by ID, text or file (/)" value={query} oninput={(e) => filter({ q: e.currentTarget.value })} />
+    <button type="button" class="filter-toggle" aria-expanded={reqFiltersOpen} aria-controls="requirement-filter-options" title="Filter requirements (F)" onclick={() => setReqFiltersOpen(!reqFiltersOpen)}>Filters{activeReqFilters ? ` (${activeReqFilters})` : ""}</button>
+    <span class="found muted nowrap" aria-live="polite">{shown.length} of {reqFilterRows.length}</span>
     {#if filtering}<a class="clear-filters" href={u({ ...route, ...clearReqFilters })} aria-label="Clear requirement filters" title="Clear requirement filters (0)">Clear</a>{/if}
     {#if route.tab === "requirements"}{@render viewSeg()}{/if}
-    {#if !onChanges}<SplitToggle />{/if}
+    {#if !onChanges && route.id}<SplitToggle />{/if}
   </div>
   <div class="req-options" id="requirement-filter-options" hidden={!reqFiltersOpen}>
-    <Seg label="State" keycap="S" hint="Press 1–7 to pick a state, S for the next one, ⇧S for the previous one" options={stateOpts} value={stateFilter} onpick={(k) => filter({ state: k })} />
-    <Seg label="Level" keycap="L" hint="Press L for the next level, ⇧L for the previous one" options={levelOpts} value={levelFilter || "all"} onpick={(k) => filter({ level: k === "all" ? undefined : k })} />
-    {#if reqFilterRows.some((r) => r.priority) || priorityFilter}<Seg label="Priority" options={metadataOpts("priority", priorityFilter, priorityTone)} value={priorityFilter ? metadataKey(priorityFilter) : "all"} onpick={(k) => filter({ priority: metadataValue(k) })} />{/if}
-    {#if reqFilterRows.some((r) => r.effort) || effortFilter}<Seg label="Effort" options={metadataOpts("effort", effortFilter, effortTone)} value={effortFilter ? metadataKey(effortFilter) : "all"} onpick={(k) => filter({ effort: metadataValue(k) })} />{/if}
-    {#if !onChanges && showChanged}<Seg label="Changes" hint="Only what the working tree changed against HEAD" options={changedSeg(reqKinds.size)} value={onlyChanged ? "changed" : "all"} onpick={pickChanged} />{/if}
-    {#if Object.keys(commits).length}<Seg label="Reviewed" hint="Hide the requirements you marked reviewed (and have not changed since)" options={[{ key: "all", label: "all" }, { key: "unreviewed", label: "unreviewed", count: reqFilterRows.filter((r) => !isReviewed(r.id)).length }]} value={onlyUnreviewed ? "unreviewed" : "all"} onpick={pickReviewed} />{/if}
+    {#if reqFiltersOpen}
+      {#each facets as key}
+        {@const values = selected(key)}
+        {@const choices = options(key)}
+        {#if choices.length > 1}
+        <div data-facet={key}>
+          <Seg label={facetLabels[key]} keycap={facetShortcuts[key]} hint={`${facetShortcuts[key]} for next choice, Shift+${facetShortcuts[key]} for previous`} options={choices} selected={values.length ? values.map((value) => JSON.stringify(value)) : [""]} onpick={(value) => value ? pickFacet(key, JSON.parse(value)) : values.length && clearFacet(key)} />
+        </div>
+        {/if}
+      {/each}
+    {/if}
   </div>
+  {#if !reqFiltersOpen && activeReqFilters}
+    <div class="filter-chips" role="group" aria-label="Active requirement filters">
+      {#each facets as key}
+        {#each new Set(selected(key)) as value (value)}
+          {@const label = value === null ? `No ${facetLabels[key].toLowerCase()}` : optionLabel(key, value)}
+          <span class="filter-chip" data-tone={optionTone(key, value)}>
+            <button type="button" title="Edit {facetLabels[key]} filter" aria-label="Edit {facetLabels[key]} filter, {label}" onclick={() => editFacet(key)}>{label}</button>
+            <button type="button" title="Remove {label}" aria-label="Remove {label} from {facetLabels[key]} filter" onclick={(e) => {
+              const chip = e.currentTarget.parentElement;
+              const next = (chip?.nextElementSibling ?? chip?.previousElementSibling)?.querySelector<HTMLButtonElement>("button:last-child");
+              pickFacet(key, value);
+              (next ?? document.querySelector<HTMLButtonElement>(".req-toolbar .filter-toggle"))?.focus();
+            }}>×</button>
+          </span>
+        {/each}
+      {/each}
+    </div>
+  {/if}
 {/snippet}
 
 {#snippet reqCell(r: any, k: string)}
@@ -603,7 +646,7 @@
   {#if trace || !float}
     <aside class:float class:stale={trace && route.id && trace.data?.id?.toUpperCase() !== route.id.toUpperCase()}>
       {#if !trace || !route.id}
-        <p class="muted empty">Select a requirement to preview it.</p>
+        <p class="muted empty">Loading requirement…</p>
       {:else}
       {@const sp = trace.data?.spec}
       <PaneHead title={trace.data.id} close={u({ ...route, id: undefined })}><RequirementBadges level={sp?.level} state={byId.get(trace.data.id)?.state} priority={sp?.priority} effort={sp?.effort} /></PaneHead>
@@ -955,7 +998,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
       <Graph modules={requirementGraph} requirements q={query} cycleGroups={requirementCycles} open={(id) => navigate(req(id))} />
     {:else}
     {@render requirementToolbar()}
-    <Split>
+    <Split showPreview={!!route.id}>
       {#snippet list()}
         <DataTable rows={shown} columns={reqCols} cell={reqCell} rowKey={(r) => r.id} selected={route.id} onselect={(k, how) => navigate({ ...route, id: k }, how === "key")} value={reqVal} groupOf={(r) => prefixOf(r.id)} tone={(r) => edgeTone(r.state)} storageKey="spec17.collapsed">
           {#snippet empty()}<p class="muted empty">No requirement matches. <a href={u({ tab: "requirements" })}>Clear filters</a></p>{/snippet}
@@ -1320,11 +1363,15 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
   .req-toolbar input:not([type=checkbox]) { min-width: 0; }
   .req-toolbar .found:empty { display: none; }
   .filter-toggle { display: inline-flex; align-items: center; gap: 8px; padding-inline: 8px; white-space: nowrap; }
-  .filter-toggle .chevron { margin-top: -.2rem; }
-  .filter-toggle[aria-expanded=true] .chevron { transform: rotate(225deg); margin-top: .2rem; }
   .req-toolbar :is(.found, .clear-filters, .filter-toggle) { font-size: var(--text-sm); }
-  .req-options:not([hidden]) { display: flex; flex-wrap: wrap; gap: var(--gap); margin-bottom: 14px; }
-  @media (max-width: 48rem) { .req-options { --segment-padding-inline: 8px; } }
+  .req-options:not([hidden]) { display: flex; flex-wrap: wrap; align-content: start; align-items: center; gap: 8px 16px; overflow: auto; max-height: min(28dvh, 15rem); flex-shrink: 0; margin-bottom: 12px; padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+  .req-options > div { min-width: 0; max-width: 100%; }
+  .filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: -6px 0 10px; }
+  .filter-chip { display: inline-flex; align-items: stretch; min-width: 0; max-width: 100%; border-radius: var(--badge-radius); color: var(--pill-ink, var(--fg)); background: var(--pill-fill, var(--tint-on)); }
+  .filter-chip button { display: grid; place-items: center; min-height: 24px; min-width: 0; border: 0; background: transparent; color: inherit; font-size: var(--text-sm); line-height: 1.2; padding: 2px 4px 2px 8px; overflow-wrap: anywhere; }
+  .filter-chip button:last-child { flex: 0 0 24px; padding: 0; font-size: 1rem; line-height: 1; }
+  .filter-chip button:hover:not(:disabled) { background: color-mix(in srgb, currentColor 12%, transparent); color: inherit; }
+  @media (max-width: 48rem) { .req-toolbar { flex-wrap: wrap; } .req-toolbar input:not([type=checkbox]) { flex-basis: 100%; } }
   /* list and preview are panes that scroll on their own: side by side (wide screens, default) or stacked (.h, and always on narrow screens) */
   aside.stale { opacity: .55; }
   .refs a, li a { text-decoration: none; }

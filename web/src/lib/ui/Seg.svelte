@@ -3,24 +3,25 @@
   import type { Tone } from "$lib/tone";
 
   type Opt = { key: string; label: string; count?: number; tone?: Tone; title?: string };
-  // a labelled segmented control: one choice, joined buttons; ←/→ move and select, focus follows
-  let { label, keycap, hint, options, value, onpick }: { label: string; keycap?: string; hint?: string; options: Opt[]; value: string; onpick: (key: string) => void } = $props();
+  // Single-choice groups select with arrows. Multi-choice groups use toggle buttons.
+  let { label, keycap, hint, options, value, selected, onpick }: { label: string; keycap?: string; hint?: string; options: Opt[]; value?: string; selected?: string[]; onpick: (key: string) => void } = $props();
+  const picked = (key: string) => selected ? selected.includes(key) : value === key;
   let bar = $state<HTMLElement>();
 
   function arrow(e: KeyboardEvent) {
     const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-    if (!d) return;
+    if (!d || selected) return;
     e.preventDefault();
     const keys = options.map((o) => o.key);
-    onpick(keys[(keys.indexOf(value) + d + keys.length) % keys.length]);
+    onpick(keys[(keys.indexOf(value ?? "") + d + keys.length) % keys.length]);
     tick().then(() => bar?.querySelector<HTMLElement>("[aria-checked=true]")?.focus());
   }
 </script>
 
-<div class="seg" class:view={label === "View"} role="radiogroup" aria-label={label} title={hint} bind:this={bar}>
+<div class="seg" class:view={label === "View"} role={selected ? "group" : "radiogroup"} aria-label={label} title={hint} bind:this={bar}>
   <span class="name" aria-hidden="true">{label}{#if keycap}{" "}<kbd>{keycap}</kbd>{/if}</span>
   {#each options as o (o.key)}
-    <button type="button" role="radio" class:zero={o.count === 0 && value !== o.key} aria-checked={value === o.key} tabindex={value === o.key ? 0 : -1} title={o.title} onclick={() => onpick(o.key)} onkeydown={arrow}>{#if o.tone}<i class="dot" data-tone={o.tone}></i>{/if}{o.label}{#if o.count !== undefined}{" "}<b>{o.count}</b>{/if}</button>
+    <button type="button" role={selected ? undefined : "radio"} class:zero={o.count === 0 && !picked(o.key)} aria-pressed={selected ? picked(o.key) : undefined} aria-checked={selected ? undefined : picked(o.key)} tabindex={selected || picked(o.key) ? 0 : -1} title={o.title} onclick={() => onpick(o.key)} onkeydown={arrow}>{#if selected}<span class="check" aria-hidden="true">✓</span>{/if}{#if o.tone}<i class="dot" data-tone={o.tone}></i>{/if}{o.label}{#if o.count !== undefined}{" "}<b>{o.count}</b>{/if}</button>
   {/each}
 </div>
 
@@ -32,8 +33,11 @@
   .name + button { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
   button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
   /* the dot keeps its colour when the segment is selected */
-  button[aria-checked=true] { position: relative; z-index: 1; background: var(--tint-sel); border-color: var(--accent); color: var(--fg); font-weight: var(--weight-semibold); }
-  button[aria-checked=true]:hover:not(:disabled) { background: var(--tint-sel-hover); color: var(--fg); }
+  button:is([aria-checked=true], [aria-pressed=true]) { position: relative; z-index: 1; background: var(--tint-sel); border-color: var(--accent); color: var(--fg); font-weight: var(--weight-semibold); }
+  button:is([aria-checked=true], [aria-pressed=true]):hover:not(:disabled) { background: var(--tint-sel-hover); color: var(--fg); }
+  button[aria-pressed=true] { background: var(--tint-sel-hover); box-shadow: inset 0 -2px var(--accent); }
+  .check { display: inline-block; margin-right: 5px; color: var(--accent); visibility: hidden; }
+  button[aria-pressed=true] .check { visibility: visible; }
   button.zero { color: var(--muted); }
   b { font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; margin-left: 2px; }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 6px 1px 0; background: var(--tone, var(--muted)); }
