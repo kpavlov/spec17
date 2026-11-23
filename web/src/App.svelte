@@ -4,6 +4,7 @@
   import { format, parse, type Route } from "$lib/router";
   import Markdown from "$lib/ui/Markdown.svelte";
   import Graph from "$lib/views/Graph.svelte";
+  import { cycles } from "$lib/requirements/cycles";
   import Split from "$lib/layout/Split.svelte";
   import SplitToggle from "$lib/layout/SplitToggle.svelte";
   import DataTable from "$lib/ui/DataTable.svelte";
@@ -29,7 +30,7 @@
   import { highlightLines } from "$lib/highlight";
 
   type Ref = { file: string; line: number; text: string };
-  type Row = { id: string; state: string; file: string; line: number; level: string; text: string; mark: string; done: boolean; verdict: string; built: boolean; issues: string[]; tests: Ref[]; cites: Ref[]; graph: string[] };
+  type Row = { id: string; state: string; file: string; line: number; level: string; text: string; references: string[]; mark: string; done: boolean; verdict: string; built: boolean; issues: string[]; tests: Ref[]; cites: Ref[]; graph: string[] };
 
   // ---- routing: the URL is the state ----
   const here = (): Route => {
@@ -158,6 +159,9 @@
   let modules = $state<any>(null);
   let tests = $state<any>(null);
   let rows = $state<Row[]>([]);
+  const plain = (t: string) => t.replace(/[`*~]/g, "");
+  const requirementCycles = $derived(cycles(rows));
+  const requirementGraph = $derived(rows.map((r) => ({ path: r.id, text: plain(r.text), tests: 0, symbols: { requirement: 1 }, depends_on: r.references.map((id) => ({ module: id, edges: 1 })) })));
   let overlap = $state<any[] | null>(null);
   let uncovered = $state<any>(null);
   let trace = $state<{ text: string; data: any } | null>(null);
@@ -449,7 +453,6 @@
   };
   const tallyBy = (files: any[]) => CHANGES.map((c) => [c, files.filter((f) => f.change === c).length] as const).filter(([, n]) => n);
   const taggedN = $derived(tests ? tests.modules.reduce((n: number, m: any) => n + m.files.reduce((k: number, f: any) => k + f.tests.filter((t: any) => t.ids.length).length, 0), 0) : 0);
-  const plain = (t: string) => t.replace(/[`*~]/g, "");
   // (WEB-45) Share in-flight requests and discard them on a dashboard reload.
   function requirementText(id: string): Promise<string> {
     const row = byId.get(id);
@@ -499,24 +502,26 @@
   let copied = $state(false);
   let showHidden = $state(stored("spec17.hidden") === "1");
   let modView = $state(stored("spec17.modules") === "graph" ? "graph" : "list");
+  let reqView = $state(["graph", "docs"].includes(stored("spec17.requirements")) ? stored("spec17.requirements") : "list");
   const save = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* storage blocked */ } };
   const copyPath = (path: string) => navigator.clipboard.writeText(path).then(() => { copied = true; setTimeout(() => (copied = false), 1200); }).catch(() => {});
 </script>
 
 {#snippet viewSeg()}
-  <Seg label="View" hint="The requirements as a list, or inside their spec documents" options={[{ key: "list", label: "list" }, { key: "docs", label: "documents" }]} value={inDocs ? "docs" : "list"} onpick={(k) => navigate({ ...route, view: k === "docs" ? "docs" : undefined, file: undefined })} />
+  <!-- (WEB-49) -->
+  <Seg label="View" options={[...VIEWS, { key: "docs", label: "documents" }]} value={route.view ?? "list"} onpick={(k) => { save("spec17.requirements", (reqView = k)); navigate({ ...route, view: k === "list" ? undefined : k, file: undefined, id: undefined }); }} /> <!-- (WEB-51) -->
 {/snippet}
 
 {#snippet requirementToolbar()}
   <!-- (WEB-33, WEB-43) -->
   <div class="bar req-toolbar">
-    {#if route.tab === "requirements"}{@render viewSeg()}{/if}
     <input name="filter" aria-label={onChanges ? "Filter affected requirements" : "Filter requirements"} placeholder="Filter requirements" title="Filter by ID, text or file (/)" value={query} oninput={(e) => filter({ q: e.currentTarget.value })} />
     <button type="button" class="filter-toggle" aria-expanded={reqFiltersOpen} aria-controls="requirement-filter-options" onclick={() => (reqFiltersOpen = !reqFiltersOpen)}>
       Filters{activeReqFilters ? ` (${activeReqFilters})` : ""}<span class="chevron" aria-hidden="true"></span>
     </button>
     <span class="found muted nowrap" aria-live="polite">{#if filtering}{shown.length} of {reqFilterRows.length}{/if}</span>
     {#if filtering}<a class="clear-filters" href={u({ ...route, ...clearReqFilters })} aria-label="Clear requirement filters" title="Clear requirement filters (0)">Clear</a>{/if}
+    {#if route.tab === "requirements"}{@render viewSeg()}{/if}
     {#if !onChanges}<SplitToggle />{/if}
   </div>
   <div class="req-options" id="requirement-filter-options" hidden={!reqFiltersOpen}>
@@ -660,7 +665,7 @@
 {/snippet}
 
 {#snippet navLink(t: string)}
-  <a class="tab" class:on={route.tab === t} aria-current={route.tab === t ? "page" : undefined} href={u({ tab: t as Route["tab"] })} title={t} aria-label={t}>
+  <a class="tab" class:on={route.tab === t} aria-current={route.tab === t ? "page" : undefined} href={u({ tab: t as Route["tab"], view: t === "requirements" && reqView !== "list" ? reqView : undefined })} title={t} aria-label={t}>
     <span class="ico"><Icon name={t as "dashboard"} /></span><span class="lbl">{t}</span>
     {#if t === "dashboard" && report?.total_problems}<span class="badge" data-tone="bad" title="{report.total_problems} problems">{report.total_problems}</span>{/if}
     {#if t === "changes" && directReqs.length}<span class="badge" data-tone="accent" title="{directReqs.length} requirements may be affected">{directReqs.length}</span>{/if}
@@ -930,6 +935,14 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
     <p class="muted empty">No requirements found. <a href="/settings">Settings</a> says what spec17 looks for; <a href="{docs}/specs/#requirement-styles" target="_blank" rel="noopener noreferrer">the docs</a> show the formats.</p>
   {:else if route.tab === "requirements"}
     <div class="page">
+    {#if route.view === "graph"}
+      <div class="bar req-toolbar"><input name="filter" aria-label="Filter requirements" placeholder="Filter requirements" value={query} oninput={(e) => filter({ q: e.currentTarget.value })} />{@render viewSeg()}</div>
+      <p class="muted">References are detected from requirement text and may not mean a dependency.</p>
+      {#if requirementCycles.length}
+        <p><b>Circular reference groups:</b> {#each requirementCycles as group}<span class="cycle-group">{"{"}{#each group as id, i}{#if i}{", "}{/if}<a href={u(req(id))}>{id}</a>{/each}{"}"}</span>{/each}</p>
+      {:else}<p class="muted">No circular references detected.</p>{/if}
+      <Graph modules={requirementGraph} requirements q={query} cycleGroups={requirementCycles} open={(id) => navigate(req(id))} />
+    {:else}
     {@render requirementToolbar()}
     <Split>
       {#snippet list()}
@@ -939,6 +952,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
       {/snippet}
       {#snippet preview()}{@render tracePanel()}{/snippet}
     </Split>
+    {/if}
     </div>
   {:else if route.tab === "code"}
     {#if !route.path}<p class="muted">No file selected: open one from a requirement's tests or citations.</p>
@@ -1291,6 +1305,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
   .bar label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer; }
 
   .req-toolbar { flex-wrap: nowrap; gap: 8px; }
+  .cycle-group { display: inline-block; margin-left: 0.75em; }
   .req-toolbar input:not([type=checkbox]) { min-width: 0; }
   .req-toolbar .found:empty { display: none; }
   .filter-toggle { display: inline-flex; align-items: center; gap: 8px; padding-inline: 8px; white-space: nowrap; }

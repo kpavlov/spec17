@@ -1,4 +1,4 @@
-// Split-pane layout shared by every page that lists on one side and previews on the other:
+// (WEB-52) Split-pane layout shared by every page that lists on one side and previews on the other:
 // the orientation is one choice for the whole dashboard, the size of the list pane is remembered per page `name` ("" = requirements and tests).
 const P = "spec17.splitpos";
 const clampPos = (n: number) => Math.min(85, Math.max(15, Math.round(n)));

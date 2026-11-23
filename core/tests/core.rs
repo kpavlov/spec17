@@ -146,6 +146,17 @@ fn status_listing_and_trace() {
     assert!(a.trace("ZZZ-1").is_none());
 }
 
+#[doc = "[WEB-47]"]
+#[test]
+fn requirement_rows_include_defined_references() {
+    let d = std::env::temp_dir().join(format!("spec17-{}-requirement-references", std::process::id()));
+    write(&d, "specs/01-demo.md", "- **DEM-01** MUST — see DEM-02, DEM-02, DEM-01 and DEM-99.\n- **DEM-02** MUST — another requirement.\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let rows = a.status(&StatusOpts { all: true, ..Default::default() }).unwrap().rows;
+    assert_eq!(rows.iter().find(|r| r.id == "DEM-01").unwrap().references, ["DEM-01", "DEM-02"]);
+    assert!(rows.iter().find(|r| r.id == "DEM-02").unwrap().references.is_empty());
+}
+
 #[doc = "[SCAN-29]"]
 #[test]
 fn a_citation_above_a_doc_comment_belongs_to_the_declaration_below() {

@@ -41,7 +41,7 @@
   });
   const grouped = $derived(!!groupOf && groups.length > 1);
 
-  // collapsed groups are remembered per browser and root (IndexedDB); everything starts expanded
+  // (WEB-13, WEB-52) Collapsed groups are remembered per browser and root (IndexedDB); everything starts expanded.
   let collapsed = $state<string[]>([]);
   // toggles made before the saved groups have loaded (group → open): they win over the saved state, which is written once it is in
   const touched = new Map<string, boolean>();

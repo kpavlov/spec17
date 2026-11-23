@@ -17,7 +17,7 @@
   }
 </script>
 
-<div class="seg" role="radiogroup" aria-label={label} title={hint} bind:this={bar}>
+<div class="seg" class:view={label === "View"} role="radiogroup" aria-label={label} title={hint} bind:this={bar}>
   <span class="name" aria-hidden="true">{label}{#if keycap}{" "}<kbd>{keycap}</kbd>{/if}</span>
   {#each options as o (o.key)}
     <button type="button" role="radio" class:zero={o.count === 0 && value !== o.key} aria-checked={value === o.key} tabindex={value === o.key ? 0 : -1} title={o.title} onclick={() => onpick(o.key)} onkeydown={arrow}>{#if o.tone}<i class="dot" data-tone={o.tone}></i>{/if}{o.label}{#if o.count !== undefined}{" "}<b>{o.count}</b>{/if}</button>
@@ -26,6 +26,7 @@
 
 <style>
   .seg { display: inline-flex; flex-wrap: wrap; align-items: center; row-gap: 4px; }
+  .view { flex-wrap: nowrap; }
   .name { color: var(--muted); font-size: var(--text-sm); margin-right: 8px; }
   button { min-height: 28px; padding: 2px var(--segment-padding-inline, 10px); font-size: var(--text-sm); border-radius: 0; border: 1px solid var(--line-strong); margin-left: -1px; white-space: nowrap; background: var(--card); }
   .name + button { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }

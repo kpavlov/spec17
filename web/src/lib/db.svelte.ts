@@ -1,4 +1,4 @@
-// Per-repo UI state in IndexedDB: the same dashboard origin can serve different roots, so every record is keyed by the root.
+// (WEB-52) Per-repo UI state in IndexedDB: the same dashboard origin can serve different roots, so every record is keyed by the root.
 // `db.root` is null until the server has said which root this is (loadReviewed sets it); readers wait for it.
 export const db = $state<{ root: string | null }>({ root: null });
 
