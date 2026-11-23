@@ -110,7 +110,7 @@
         queueMicrotask(() => document.querySelector<HTMLInputElement>("input[name=filter]")?.focus());
       } else if ((route.tab === "requirements" || route.tab === "changes") && e.key.toLowerCase() === "f" && hasFilters) {
         e.preventDefault(); setReqFiltersOpen(true); tick().then(() => document.querySelector<HTMLInputElement>(".req-options button")?.focus());
-      } else if (document.querySelector(".req-toolbar .filter-toggle") && /^[0-7slpecr]$/i.test(e.key)) {
+      } else if ((route.tab === "requirements" || route.tab === "changes") && document.querySelector(".req-toolbar .filter-toggle") && /^[0-7slpecr]$/i.test(e.key)) {
         const k = e.key.toLowerCase();
         const field = facets.find((key) => facetShortcuts[key].toLowerCase() === k);
         if (k === "0") navigate({ ...route, ...clearReqFilters });
@@ -462,6 +462,7 @@
   const symbolsOf = (m: any) => Object.values<number>(m.symbols).reduce((a, b) => a + b, 0);
   // The tests screen filters the detected cases; the requirement table uses the same cases for its links (WEB-39).
   const testOpts = $derived(["all", "tagged", "untagged"].map((k) => ({ key: k, label: k, count: tcounts[k] })));
+  const activeTestFilters = $derived([stateFilter !== "all", route.module, onlyChanged].filter(Boolean).length);
   const VIEWS = [{ key: "list", label: "list" }, { key: "graph", label: "graph" }];
   const detectedCases = $derived<any[]>((tests?.modules ?? []).flatMap((m: any) => m.files.flatMap((f: any) => f.tests.map((t: any) => ({ module: m.module, file: f.file, t })))));
   const testedIds = $derived(new Set<string>(detectedCases.flatMap((c) => c.t.ids)));
@@ -1117,20 +1118,24 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
     {:else if modules}<p class="muted empty">No module matches. <a href="/modules">Clear filter</a></p>{/if}
   {:else if route.tab === "tests"}
     <div class="page">
-    <div class="bar">
+    <!-- (WEB-62) -->
+    <div class="bar req-toolbar">
       <input name="filter" aria-label="filter tests" placeholder="Filter test, file, requirement ID   ( / )" value={query} oninput={(e) => filter({ q: e.currentTarget.value })} />
-      <Filters active={[stateFilter !== "all", route.module, onlyChanged].filter(Boolean).length}>
-        <Seg label="Tagged" options={testOpts} value={stateFilter} onpick={(k) => filter({ state: k })} />
-        {#if showChanged}<Seg label="Changes" options={changedSeg(allCases.filter((c) => fileOf.has(c.file)).length)} value={onlyChanged ? "changed" : "all"} onpick={pickChanged} />{/if}
-        <select aria-label="module" value={route.module ?? ""} onchange={(e) => filter({ module: e.currentTarget.value || undefined })}>
-          <option value="">all modules</option>
-          {#each modules?.modules ?? [] as m}<option value={m.path}>{m.path}</option>{/each}
-        </select>
-      </Filters>
+      <button type="button" class="filter-toggle" aria-expanded={reqFiltersOpen} aria-controls="test-filter-options" aria-label={activeTestFilters ? `Filters, ${activeTestFilters} active` : "Filters"} title="Filter tests" onclick={() => setReqFiltersOpen(!reqFiltersOpen)}><Icon name="filter" />{#if activeTestFilters}<span class="n">{activeTestFilters}</span>{/if}</button>
+      <span class="found muted nowrap" aria-live="polite">{testRows.length} of {allCases.length}</span>
+      {#if activeTestFilters || query}<a class="clear-filters" href={u({ ...route, state: undefined, module: undefined, changed: undefined, q: undefined })} aria-label="Clear test filters">Clear</a>{/if}
       {#if testRequirement}
         <a href={u({ ...route, requirementId: undefined })} aria-label="Clear requirement filter {testRequirement}">{testRequirement} ×</a>
       {/if}
       <SplitToggle />
+    </div>
+    <div class="req-options" id="test-filter-options" hidden={!reqFiltersOpen}>
+      <Seg label="Tagged" options={testOpts} value={stateFilter} onpick={(k) => filter({ state: k })} />
+      {#if showChanged}<Seg label="Changes" options={changedSeg(allCases.filter((c) => fileOf.has(c.file)).length)} value={onlyChanged ? "changed" : "all"} onpick={pickChanged} />{/if}
+      <select aria-label="module" title={route.module} value={route.module ?? ""} onchange={(e) => filter({ module: e.currentTarget.value || undefined })}>
+        <option value="">all modules</option>
+        {#each modules?.modules ?? [] as m}<option value={m.path}>{m.path}</option>{/each}
+      </select>
     </div>
     {#if tests === null}<p class="muted">Loading…</p>
     {:else}
@@ -1376,6 +1381,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
   .req-toolbar :is(.found, .clear-filters, .filter-toggle) { font-size: var(--text-sm); }
   .req-options:not([hidden]) { display: flex; flex-wrap: wrap; align-content: start; align-items: center; gap: 8px 16px; overflow: auto; max-height: min(28dvh, 15rem); flex-shrink: 0; margin-bottom: 12px; padding: 8px 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
   .req-options > div { min-width: 0; max-width: 100%; }
+  .req-options select { flex: 1 1 0; min-width: 12rem; max-width: 100%; text-overflow: ellipsis; } /* last in the row: takes what the other filters leave, so a long module path has room and does not wrap the row */
   .filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: -6px 0 10px; }
   .filter-chip { display: inline-flex; align-items: stretch; min-width: 0; max-width: 100%; border-radius: var(--badge-radius); color: var(--pill-ink, var(--fg)); background: var(--pill-fill, var(--tint-on)); }
   .filter-chip button { display: grid; place-items: center; min-height: 24px; min-width: 0; border: 0; background: transparent; color: inherit; font-size: var(--text-sm); line-height: 1.2; padding: 2px 4px 2px 8px; overflow-wrap: anywhere; }
