@@ -96,6 +96,8 @@ impl Analysis {
             line: s.line,
             level: s.level.clone(),
             text: s.text.clone(),
+            priority: s.priority.clone(),
+            effort: s.effort.clone(),
             references: self.p.rx.mention.captures_iter(&s.text).map(|m| m[1].to_string()).filter(|id| self.s.contains_key(id)).collect::<BTreeSet<_>>().into_iter().collect(), // (WEB-47)
             mark: s.mark.clone(),
             done: s.done,
@@ -118,6 +120,8 @@ pub struct Row {
     pub line: usize,
     pub level: String,
     pub text: String,
+    pub priority: Option<String>,
+    pub effort: Option<String>,
     pub references: Vec<String>,
     pub mark: String,
     pub done: bool,

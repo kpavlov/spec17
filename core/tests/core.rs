@@ -32,6 +32,7 @@ fn fixture(name: &str) -> PathBuf {
 @Test(\"[DEM\x2D01] works\") func a() {
     #expect(true)
 }
+
 @Test(\"[DEM\x2D05] built already\") func b() {
     let x = 1
 }
@@ -53,6 +54,44 @@ struct Demo {
     d
 }
 
+#[doc = "[SCAN-40]"]
+#[test]
+fn priority_and_effort_metadata() {
+    let d = fixture("metadata");
+    write(&d, "specs/01-demo.md", "\
+- **DEM-01** MUST — P12 first (effort: XL) (manual)\n\
+- **DEM-02** SHOULD — [p2] second [M].\n\
+- **DEM-03** MAY — no priority; XP1 and P2x are not hints. [estimate: 3 days]\n\
+- **DEM-04** MUST — (Priority: P1) (size: XL).\n\
+- **DEM-05** MUST — [P3] (S).\n\
+- **DEM-06** MUST — [effort: 5 points] and (L).\n\
+- **DEM-07** MUST — (effort: invalid] [unknown] and ordinary text.\n\
+- **DEM-08** MUST — P3 [M] (Priority: P1) (effort: 5 points).\n\
+- **DEM-09** MUST — (effort:   ) [M].\n\
+- **DEM-10** MUST — (effort:  ) (effort: XL).\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let one = &a.s["DEM-01"];
+    assert_eq!((one.priority.as_deref(), one.effort.as_deref(), one.mark.as_str()), (Some("P12"), Some("XL"), "manual"));
+    assert_eq!(a.s["DEM-02"].priority.as_deref(), Some("P2"));
+    assert_eq!(a.s["DEM-02"].effort.as_deref(), Some("M"));
+    assert_eq!(a.s["DEM-03"].priority, None);
+    assert_eq!(a.s["DEM-03"].effort.as_deref(), Some("3 days"));
+    assert_eq!((a.s["DEM-04"].priority.as_deref(), a.s["DEM-04"].effort.as_deref()), (Some("P1"), Some("XL")));
+    assert_eq!(a.s["DEM-05"].effort.as_deref(), Some("S"));
+    assert_eq!(a.s["DEM-06"].effort.as_deref(), Some("5 points"));
+    assert_eq!(a.s["DEM-07"].effort, None);
+    assert_eq!((a.s["DEM-08"].priority.as_deref(), a.s["DEM-08"].effort.as_deref()), (Some("P1"), Some("5 points")));
+    assert_eq!(a.s["DEM-09"].effort.as_deref(), Some("M"));
+    assert_eq!(a.s["DEM-10"].effort.as_deref(), Some("XL"));
+    let rows = a.status(&StatusOpts { all: true, ..Default::default() }).unwrap();
+    let json = serde_json::to_value(&rows).unwrap();
+    let row = json["rows"].as_array().unwrap().iter().find(|r| r["id"] == "DEM-01").unwrap();
+    assert_eq!(row["priority"], "P12");
+    assert_eq!(row["effort"], "XL");
+    let trace = serde_json::to_value(a.trace("DEM-01").unwrap()).unwrap();
+    assert_eq!(trace["spec"]["priority"], "P12");
+    assert_eq!(trace["spec"]["effort"], "XL");
+}
 #[doc = "[SCAN-01, SCAN-02, SCAN-03, SCAN-04]"]
 #[test]
 fn states_and_issues() {
@@ -974,7 +1013,7 @@ fn changes_by_ref_commit_rename_delete_whitespace_and_history() {
     let d = scratch("changes2");
     write(&d, "spec17.json", r#"{"src":["src"],"tests":["tests"],"ext":["kt"]}"#);
     write(&d, ".spec17ignore", "hidden/\n");
-    write(&d, "specs/a.md", "- **AAA-01** MUST — one.\n- **AAA-02** MUST — two.\n- **AAA-03** MUST — three.\n");
+    write(&d, "specs/a.md", "- **AAA-01** MUST — one.\n- **AAA-02** MUST — two [P2] [M].\n- **AAA-03** MUST — three.\n");
     write(&d, "tests/AT.kt", "// [AAA\x2D01]\nfun t1() {\n    check(1)\n}\n\n// [AAA\x2D02]\nfun t2() {\n    check(2)\n}\n");
     write(&d, "src/old.kt", "// (AAA-01)\nfun f() {\n    1\n}\n");
     write(&d, "notes.txt", "n\n");
@@ -990,7 +1029,7 @@ fn changes_by_ref_commit_rename_delete_whitespace_and_history() {
     git(&["checkout", "-qb", "feature"]);
     // commit 1: edit the AAA-02 test only, drop AAA-03, rename old.kt
     write(&d, "tests/AT.kt", "// [AAA\x2D01]\nfun t1() {\n    check(1)\n}\n\n// [AAA\x2D02]\nfun t2() {\n    check(22)\n}\n");
-    write(&d, "specs/a.md", "- **AAA-01** MUST — one.\n- **AAA-02** MUST — two.\n");
+    write(&d, "specs/a.md", "- **AAA-01** MUST — one.\n- **AAA-02** MUST — two [P2] [M].\n");
     git(&["mv", "src/old.kt", "src/new.kt"]);
     write(&d, "notes.txt", "n2\n");
     write(&d, "hidden/h.kt", "y\n");
@@ -1015,6 +1054,8 @@ fn changes_by_ref_commit_rename_delete_whitespace_and_history() {
     assert_eq!(c.files[1].old_path.as_deref(), Some("src/old.kt"));
     // (the whitespace-only edit of the renamed cited function is no change: SCAN-32)
     assert_eq!(ids(&c), ["AAA-02:test", "AAA-03:spec"], "{c:?}");
+    let changed = c.requirements.iter().find(|r| r.id == "AAA-02").unwrap();
+    assert_eq!((changed.priority.as_deref(), changed.effort.as_deref()), (Some("P2"), Some("M")));
     let gone = c.requirements.iter().find(|r| r.id == "AAA-03").unwrap();
     assert!(gone.deleted && gone.state == "deleted" && gone.text.contains("three"), "{gone:?}");
     assert!(c.text().contains("(from src/old.kt)"));

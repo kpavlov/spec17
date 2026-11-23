@@ -13,6 +13,8 @@ Well-known tokens that look like IDs are never requirements: `UTF-8`, `ISO-8601`
 
 A requirement also has a level: `MUST`, `SHOULD`, `MAY` or `SHALL`. Heading and paragraph styles accept the EARS `shall` in lower case too; bullets and table rows do not, and `should` and `may` must always be capitals.
 
+An optional standalone `P1`, `P2` or other `P` followed by digits in the requirement text is a priority hint, including `[P1]` and `(Priority: P1)`. An effort hint can be a T-shirt size such as `[M]` or `(XL)`, or a labelled estimate such as `[effort: 3 points]`, `(size: M)` or `[estimate: 2 days]`. Listings and traces expose both as separate fields, and keep them in the text. Labelled hints take precedence over unlabelled hints; otherwise the order of patterns in `spec_format.toml` decides, then the first match of that pattern. A bare size or priority can also occur in ordinary prose, so review the result. Place annotations before an ending `(manual)` or `(later)` marker.
+
 ## Requirement styles
 
 spec17 reads several ways of writing a requirement, and one repo can mix them. The styles below are small fixtures in `core/test-data` that the tests load: bullets, tables, Spec Kit, headings and paragraphs are files of the `styles` repo; OpenSpec, Kiro, Superpowers and the fallback each have a repo of their own. Spec folders are detected, so there is nothing to configure.

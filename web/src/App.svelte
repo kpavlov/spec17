@@ -11,6 +11,7 @@
   import { MediaQuery } from "svelte/reactivity";
   import { levelPills } from "$lib/requirements/levelPills";
   import RequirementBadges from "$lib/requirements/RequirementBadges.svelte";
+  import { metadataKey, metadataValue } from "$lib/requirements/metadata";
   import Filters from "$lib/ui/Filters.svelte";
   import Seg from "$lib/ui/Seg.svelte";
   import FileTree from "$lib/ui/FileTree.svelte";
@@ -20,7 +21,7 @@
   import RequirementLink from "$lib/requirements/RequirementLink.svelte";
   import Section from "$lib/ui/Section.svelte";
   import PaneHead from "$lib/ui/PaneHead.svelte";
-  import { requirementLevelTone, stateTone, edgeTone, levelTone, changeTone, stateLabel, STATE_HINT, type Tone } from "$lib/tone";
+  import { requirementLevelTone, priorityTone, effortTone, stateTone, edgeTone, levelTone, changeTone, stateLabel, STATE_HINT, type Tone } from "$lib/tone";
   import { preview } from "$lib/layout/layout.svelte";
   import { reviewed, loadReviewed, setReviewed } from "$lib/reviewed.svelte";
   import DiffView from "$lib/views/DiffView.svelte";
@@ -30,7 +31,7 @@
   import { highlightLines } from "$lib/highlight";
 
   type Ref = { file: string; line: number; text: string };
-  type Row = { id: string; state: string; file: string; line: number; level: string; text: string; references: string[]; mark: string; done: boolean; verdict: string; built: boolean; issues: string[]; tests: Ref[]; cites: Ref[]; graph: string[] };
+  type Row = { id: string; state: string; file: string; line: number; level: string; priority: string | null; effort: string | null; text: string; references: string[]; mark: string; done: boolean; verdict: string; built: boolean; issues: string[]; tests: Ref[]; cites: Ref[]; graph: string[] };
 
   // ---- routing: the URL is the state ----
   const here = (): Route => {
@@ -379,23 +380,31 @@
   const query = $derived(route.q ?? "");
   const levels = ["MUST", "SHOULD", "MAY"];
   const levelFilter = $derived(route.level ?? "");
+  const priorityFilter = $derived(route.priority ?? "");
+  const effortFilter = $derived(route.effort ?? "");
   const onChanges = $derived(route.tab === "changes");
+  // (WEB-57) change records include their own metadata, even when the status list is truncated
   const reqFilterRows = $derived<Row[]>(onChanges ? view?.requirements ?? [] : rows);
-  const clearReqFilters = { state: undefined, level: undefined, q: undefined, changed: undefined, reviewed: undefined };
-  let reqFiltersOpen = $state(false);
+  const clearReqFilters = { state: undefined, level: undefined, priority: undefined, effort: undefined, q: undefined, changed: undefined, reviewed: undefined };
+  let reqFiltersOpen = $state(stored("spec17.requirementFilters") === "1"); // (WEB-58)
   // SHALL and reference docs have no chip of their own: they group under "other"
   const levelOf = (r: Row) => (levels.includes(r.level) ? r.level : "other");
   // the rows that pass every filter except the one named: what a chip of that filter would show
-  const facet = (skip?: "state" | "level") => reqFilterRows.filter((r) => (skip === "state" || stateFilter === "all" || r.state === stateFilter) && (skip === "level" || !levelFilter || levelOf(r) === levelFilter) && (onChanges || !onlyChanged || reqKinds.has(r.id)) && (!onlyUnreviewed || !isReviewed(r.id)) && (!query || `${r.id} ${r.text} ${r.file}`.toLowerCase().includes(query.toLowerCase())));
-  const tally = (list: Row[], key: (r: Row) => string) => list.reduce<Record<string, number>>((m, r) => ((m[key(r)] = (m[key(r)] ?? 0) + 1), m), {});
+  const facet = (skip?: "state" | "level" | "priority" | "effort") => reqFilterRows.filter((r) => (skip === "state" || stateFilter === "all" || r.state === stateFilter) && (skip === "level" || !levelFilter || levelOf(r) === levelFilter) && (skip === "priority" || !priorityFilter || r.priority === priorityFilter) && (skip === "effort" || !effortFilter || r.effort === effortFilter) && (onChanges || !onlyChanged || reqKinds.has(r.id)) && (!onlyUnreviewed || !isReviewed(r.id)) && (!query || `${r.id} ${r.text} ${r.file}`.toLowerCase().includes(query.toLowerCase())));
+  const tally = (list: Row[], key: (r: Row) => string) => list.reduce<Record<string, number>>((m, r) => ((m[key(r)] = (m[key(r)] ?? 0) + 1), m), Object.create(null));
   const shown = $derived(facet());
   const stateN = $derived.by(() => { const l = facet("state"); return { ...tally(l, (r) => r.state), all: l.length } as Record<string, number>; });
   const levelN = $derived.by(() => { const l = facet("level"); return { ...tally(l, levelOf), all: l.length } as Record<string, number>; });
+  const metadataOpts = (key: "priority" | "effort", selected: string, tone: (value: string) => Tone) => {
+    const values = [...new Set([...reqFilterRows.map((r) => r[key]).filter((v): v is string => !!v), ...(selected ? [selected] : [])])].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    const list = facet(key), counts = tally(list, (r) => r[key] ?? "");
+    return [{ key: "all", label: "all", count: list.length }, ...values.map((v) => ({ key: metadataKey(v), label: v, count: counts[v] ?? 0, tone: tone(v) }))];
+  };
   const presentStates = $derived(new Set(reqFilterRows.map((r) => r.state)));
   const presentLevels = $derived(new Set(reqFilterRows.map(levelOf)));
   const stateKeys = $derived(states.filter((st) => st === "all" || st === stateFilter || presentStates.has(st)));
   const levelKeys = $derived(["all", ...[...levels, "other"].filter((lv) => lv === levelFilter || presentLevels.has(lv))]);
-  const activeReqFilters = $derived([stateFilter !== "all", levelFilter, !onChanges && onlyChanged, onlyUnreviewed].filter(Boolean).length);
+  const activeReqFilters = $derived([stateFilter !== "all", levelFilter, priorityFilter, effortFilter, !onChanges && onlyChanged, onlyUnreviewed].filter(Boolean).length);
   const filtering = $derived(!!activeReqFilters || !!query);
   // a "changed only" switch with its count; shown once something changed (or while it is on, so it can be turned off)
   const changedSeg = (n: number) => [{ key: "all", label: "all" }, { key: "changed", label: "changed", count: n }];
@@ -516,7 +525,7 @@
   <!-- (WEB-33, WEB-43) -->
   <div class="bar req-toolbar">
     <input name="filter" aria-label={onChanges ? "Filter affected requirements" : "Filter requirements"} placeholder="Filter requirements" title="Filter by ID, text or file (/)" value={query} oninput={(e) => filter({ q: e.currentTarget.value })} />
-    <button type="button" class="filter-toggle" aria-expanded={reqFiltersOpen} aria-controls="requirement-filter-options" onclick={() => (reqFiltersOpen = !reqFiltersOpen)}>
+    <button type="button" class="filter-toggle" aria-expanded={reqFiltersOpen} aria-controls="requirement-filter-options" onclick={() => { reqFiltersOpen = !reqFiltersOpen; save("spec17.requirementFilters", reqFiltersOpen ? "1" : "0"); }}>
       Filters{activeReqFilters ? ` (${activeReqFilters})` : ""}<span class="chevron" aria-hidden="true"></span>
     </button>
     <span class="found muted nowrap" aria-live="polite">{#if filtering}{shown.length} of {reqFilterRows.length}{/if}</span>
@@ -527,6 +536,8 @@
   <div class="req-options" id="requirement-filter-options" hidden={!reqFiltersOpen}>
     <Seg label="State" keycap="S" hint="Press 1–7 to pick a state, S for the next one, ⇧S for the previous one" options={stateOpts} value={stateFilter} onpick={(k) => filter({ state: k })} />
     <Seg label="Level" keycap="L" hint="Press L for the next level, ⇧L for the previous one" options={levelOpts} value={levelFilter || "all"} onpick={(k) => filter({ level: k === "all" ? undefined : k })} />
+    {#if reqFilterRows.some((r) => r.priority) || priorityFilter}<Seg label="Priority" options={metadataOpts("priority", priorityFilter, priorityTone)} value={priorityFilter ? metadataKey(priorityFilter) : "all"} onpick={(k) => filter({ priority: metadataValue(k) })} />{/if}
+    {#if reqFilterRows.some((r) => r.effort) || effortFilter}<Seg label="Effort" options={metadataOpts("effort", effortFilter, effortTone)} value={effortFilter ? metadataKey(effortFilter) : "all"} onpick={(k) => filter({ effort: metadataValue(k) })} />{/if}
     {#if !onChanges && showChanged}<Seg label="Changes" hint="Only what the working tree changed against HEAD" options={changedSeg(reqKinds.size)} value={onlyChanged ? "changed" : "all"} onpick={pickChanged} />{/if}
     {#if Object.keys(commits).length}<Seg label="Reviewed" hint="Hide the requirements you marked reviewed (and have not changed since)" options={[{ key: "all", label: "all" }, { key: "unreviewed", label: "unreviewed", count: reqFilterRows.filter((r) => !isReviewed(r.id)).length }]} value={onlyUnreviewed ? "unreviewed" : "all"} onpick={pickReviewed} />{/if}
   </div>
@@ -534,7 +545,7 @@
 
 {#snippet reqCell(r: any, k: string)}
   {#if k === "id"}{#if commits[r.id]}<input type="checkbox" class="rv" aria-label="reviewed" title={reviewTip(r.id)} checked={isReviewed(r.id)} onchange={(e) => setReviewed(r.id, e.currentTarget.checked ? commits[r.id].sha : undefined)} />{:else if Object.keys(commits).length}<span class="rv muted" title="not committed yet: commit it to review it">·</span>{/if}{#if r.deleted || !known.has(r.id)}{r.id}{:else}<a href={u(route.tab === "requirements" ? { ...route, id: r.id } : req(r.id))}>{r.id}</a>{/if}
-    <div class="badges"><RequirementBadges level={r.level} state={r.state} deleted={r.deleted} /></div>
+    <div class="badges"><RequirementBadges level={r.level} state={r.state} priority={r.priority} effort={r.effort} deleted={r.deleted} /></div>
     {#if r.done}<Pill tone={stateTone.done} title="check-marked: {r.verdict}">✓ {r.verdict}</Pill>{/if}
   {:else if k === "text"}<div class="txt" title={plain(r.text)} {@attach levelPills(r.text)}>{@html inline(r.text)}</div>
     <div class="notes">
@@ -568,7 +579,7 @@
 {/snippet}
 
 {#snippet reqRef(id: string, to: Route)}
-  {@render requirementLink(id, to)}{#if byId.get(id)}{" "}<RequirementBadges level={byId.get(id)!.level} state={byId.get(id)!.state} />{/if}
+  {@render requirementLink(id, to)}{#if byId.get(id)}{" "}<RequirementBadges level={byId.get(id)!.level} state={byId.get(id)!.state} priority={byId.get(id)!.priority} effort={byId.get(id)!.effort} />{/if}
 {/snippet}
 
 {#snippet th(label: string, key: string, st: Sort, cls = "")}
@@ -595,7 +606,7 @@
         <p class="muted empty">Select a requirement to preview it.</p>
       {:else}
       {@const sp = trace.data?.spec}
-      <PaneHead title={trace.data.id} close={u({ ...route, id: undefined })}><RequirementBadges level={sp?.level} state={byId.get(trace.data.id)?.state} /></PaneHead>
+      <PaneHead title={trace.data.id} close={u({ ...route, id: undefined })}><RequirementBadges level={sp?.level} state={byId.get(trace.data.id)?.state} priority={sp?.priority} effort={sp?.effort} /></PaneHead>
       {@const dfiles = reqFiles(trace.data, reqKinds.get(trace.data.id))}
       {#if dfiles.length}<p><ViewSwitch n={dfiles.length} /></p>{/if}
       {#if diffOn(dfiles.length > 0)}

@@ -18,6 +18,8 @@ pub struct Format {
     pub level: String,
     pub block_level: String,
     pub done: String,
+    pub priority: Vec<String>,
+    pub effort: Vec<String>,
     pub line: Vec<String>,
     pub block: Vec<String>,
     pub removed: String,
@@ -46,6 +48,8 @@ pub struct Line {
     /// with an optional `:`. Group 1 is the ID, group 2 the rest of the line.
     pub head: Regex,
     pub level: Regex,
+    priority: Patterns,
+    effort: Patterns,
     /// The level in a heading or paragraph block: EARS `shall` in lower case counts too.
     block_level: Regex,
     /// A `block` opener of `spec_format.toml`: a heading or paragraph whose level may sit on any of its lines.
@@ -65,6 +69,8 @@ pub static LINE: std::sync::LazyLock<Line> = std::sync::LazyLock::new(|| {
     Line {
         head: r(format!(r"^\s*(?:{open})(?:{}\s*)?[*_`]*({})(?-u:\b)[*_`]*[:.]?[*_`]*(.*)", f.done, f.id())),
         level: r(f.level.clone()),
+        priority: Patterns(f.priority.iter().map(|s| r(s.clone())).collect()),
+        effort: Patterns(f.effort.iter().map(|s| r(s.clone())).collect()),
         block_level: r(f.block_level.clone()),
         opens_block: r(format!(r"^\s*(?:{})", f.block.join("|"))),
         wrap_end: r(r"^\s*([-*+] |\d+[.)] |#|\|)".into()),
@@ -146,6 +152,8 @@ pub struct Spec {
     pub end: usize,
     pub level: String,
     pub text: String,
+    pub priority: Option<String>,
+    pub effort: Option<String>,
     /// "" | "manual" | "later"
     pub mark: String,
     pub done: bool,
@@ -529,7 +537,7 @@ impl Project {
         let docs = found.into_iter().map(|(id, file)| {
             let stem = file.rsplit('/').next().unwrap_or(&file).trim_end_matches(".md").to_string();
             let text = self.lines(&file).iter().find_map(|l| l.strip_prefix("# ").map(|h| h.trim().to_string())).unwrap_or(stem);
-            Spec { id, file, line: 1, end: 1, level: "DOC".into(), text, mark: "ref".into(), done: false }
+            Spec { id, file, line: 1, end: 1, level: "DOC".into(), text, priority: None, effort: None, mark: "ref".into(), done: false }
         }).collect();
         (docs, linked)
     }
@@ -596,7 +604,10 @@ impl Project {
                 if done && !mark.is_empty() {
                     problems.push(Issue::new(&id, format!("{f}:{n} has a check mark but is also marked ({}/deferred)", if mark == "manual" { "manual" } else { "later" })));
                 }
-                found.insert(id.clone(), Spec { id, file: f.clone(), line: n, end: j, level: lv, text, mark: mark.into(), done });
+                // (SCAN-40)
+                let priority = LINE.priority.captures(&text).and_then(|m| m.get(1)).map(|m| m.as_str().to_ascii_uppercase());
+                let effort = LINE.effort.0.iter().flat_map(|r| r.captures_iter(&text)).filter_map(|m| m.get(1).map(|v| v.as_str().trim())).find(|v| !v.is_empty()).map(str::to_string);
+                found.insert(id.clone(), Spec { id, file: f.clone(), line: n, end: j, level: lv, text, priority, effort, mark: mark.into(), done });
             }
         }
         // a line without a level that names a defined ID is a reference to it (a cross-reference table, a review note)
