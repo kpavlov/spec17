@@ -1,5 +1,5 @@
 //! MCP over stdio or streamable HTTP. Both share the tools and the MCP Apps dashboard resource.
-use crate::{AppState, frontend, ops};
+use crate::{AppState, frontend, ops, skill};
 use rmcp::{
     ErrorData, RoleServer, ServerHandler, ServiceExt,
     model::*,
@@ -11,18 +11,41 @@ use serde_json::{Value, json};
 /// How often a subscription looks for a change.
 const POLL: std::time::Duration = std::time::Duration::from_secs(1);
 const UI_URI: &str = "ui://spec17/dashboard";
+const SKILL_URI: &str = "skill://spec17/SKILL.md";
 use ops::{JSON_MIME, SCHEMA_MIME, TEXT_MIME};
 const UI_MIME: &str = "text/html;profile=mcp-app";
 
 #[derive(Clone)]
 struct Mcp(AppState);
 
+// (API-25)
+fn skill_entry() -> Result<Skill, ErrorData> {
+    let frontmatter = skill::SKILL.strip_prefix("---\n").and_then(|s| s.find("\n---\n").map(|end| &s[..=end]))
+        .ok_or_else(|| ErrorData::internal_error("invalid skill frontmatter", None))?;
+    let frontmatter = yaml_serde::from_str(frontmatter).map_err(|e| ErrorData::internal_error(format!("invalid skill frontmatter: {e}"), None))?;
+    Ok(Skill::new(SKILL_URI, frontmatter, SkillResources::Files(vec![SkillResource::from_bytes(SKILL_URI, skill::SKILL.as_bytes())])))
+}
+
 impl ServerHandler for Mcp {
     fn get_info(&self) -> ServerConfig {
         // (API-24)
-        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_resources_subscribe().build())
+        ServerConfig::new(ServerCapabilities::builder().enable_tools().enable_resources().enable_resources_subscribe().enable_skills().build())
             .with_server_info(Implementation::new(env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION")).with_website_url(env!("CARGO_PKG_HOMEPAGE")))
             .with_instructions(format!("Deterministic spec-driven-development evidence for one repo. {}", ops::NOTE))
+    }
+
+    async fn list_skills(&self, request: Option<PaginatedRequestParams>, _: RequestContext<RoleServer>) -> Result<ListSkillsResult, ErrorData> {
+        if request.is_some_and(|params| params.cursor.is_some()) {
+            return Err(ErrorData::invalid_params("invalid skill cursor", None));
+        }
+        Ok(ListSkillsResult::with_all_items(vec![skill_entry()?]))
+    }
+
+    async fn get_skill(&self, request: GetSkillRequestParams, _: RequestContext<RoleServer>) -> Result<GetSkillResult, ErrorData> {
+        if request.uri != SKILL_URI {
+            return Err(ErrorData::invalid_params("unknown skill", None));
+        }
+        Ok(GetSkillResult::new(skill_entry()?))
     }
 
     async fn list_tools(&self, _: Option<PaginatedRequestParams>, _: RequestContext<RoleServer>) -> Result<ListToolsResult, ErrorData> {
@@ -77,6 +100,8 @@ impl ServerHandler for Mcp {
             r
         };
         let mut all = vec![Resource::new(UI_URI, "spec17 dashboard").with_description("Spec-driven status dashboard (MCP Apps)").with_mime_type(UI_MIME)];
+        let skill = skill_entry()?;
+        all.push(Resource::new(SKILL_URI, skill.frontmatter.name).with_description(skill.frontmatter.description).with_mime_type("text/markdown"));
         for tool in ops::VIEW_TOOLS {
             all.push(Resource::new(format!("spec17://{tool}"), format!("spec17 {tool}")).with_description(ops::tool_description(tool)).with_mime_type(TEXT_MIME));
         }
@@ -92,6 +117,12 @@ impl ServerHandler for Mcp {
     }
 
     async fn read_resource(&self, request: ReadResourceRequestParams, _: RequestContext<RoleServer>) -> Result<ReadResourceResponse, ErrorData> {
+        if request.uri == SKILL_URI {
+            return Ok(ReadResourceResult::new(vec![ResourceContents::text(skill::SKILL, SKILL_URI).with_mime_type("text/markdown")]).into());
+        }
+        if request.uri.starts_with("skill://") {
+            return Err(ErrorData::invalid_params("unknown skill resource", None));
+        }
         if request.uri != UI_URI {
             let (root, uri) = (self.0.root.clone(), request.uri.to_string());
             let text = tokio::task::spawn_blocking(move || ops::read_resource(root.as_deref(), &uri)).await.map_err(|e| ErrorData::internal_error(e.to_string(), None))?.map_err(|e| ErrorData::internal_error(e, None))?;

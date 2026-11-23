@@ -7,7 +7,7 @@ const NAME: &str = "spec17";
 const STDIO_NAME: &str = "spec17-stdio";
 const STDIO_FLAGS: [&str; 3] = ["--stdio-mcp", "--no-http-mcp", "--no-ui"];
 const CODEGRAPH: &str = "codegraph";
-const SKILL: &str = include_str!("../../skills/spec17/SKILL.md");
+pub const SKILL: &str = include_str!("../../skills/spec17/SKILL.md");
 
 /// `<repo>/.agents/skills` or `~/.agents/skills`.
 pub fn skills_dir(root: Option<&Path>, global: bool) -> Result<PathBuf, String> {
