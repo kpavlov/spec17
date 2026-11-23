@@ -6,7 +6,8 @@
 - Add a graph of references between requirements, with circular references highlighted.
 - Recognize requirement tags in comments attached to tests, reported apart from invalid tests.
 - Improve test detection across languages, including Swift.
-- Expose the embedded agent skill through the MCP Skills extension, and rewrite it around the question asked.
+- Expose the embedded agent skill through the MCP Skills extension
+- Rewrite SKILL.md around the question asked.
 - Rework the requirement filters: one value per click or several with a modifier key, and no fields with nothing to choose.
 - Use the same filter toolbar on the Tests page, and hide its preview until a test is selected.
 - Link requirement notes on Changes to the file's diff, and show longer requirement previews.
