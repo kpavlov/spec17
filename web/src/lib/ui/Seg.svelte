@@ -4,7 +4,7 @@
 
   type Opt = { key: string; label: string; count?: number; tone?: Tone; title?: string };
   // Single-choice groups select with arrows. Multi-choice groups use toggle buttons.
-  let { label, keycap, hint, options, value, selected, onpick }: { label: string; keycap?: string; hint?: string; options: Opt[]; value?: string; selected?: string[]; onpick: (key: string) => void } = $props();
+  let { label, keycap, hint, options, value, selected, nowrap = false, onpick }: { label: string; keycap?: string; hint?: string; options: Opt[]; value?: string; selected?: string[]; nowrap?: boolean; onpick: (key: string) => void } = $props();
   const picked = (key: string) => selected ? selected.includes(key) : value === key;
   let bar = $state<HTMLElement>();
 
@@ -18,7 +18,7 @@
   }
 </script>
 
-<div class="seg" class:view={label === "View"} role={selected ? "group" : "radiogroup"} aria-label={label} title={hint} bind:this={bar}>
+<div class="seg" class:nowrap role={selected ? "group" : "radiogroup"} aria-label={label} title={hint} bind:this={bar}>
   <span class="name" aria-hidden="true">{label}{#if keycap}{" "}<kbd>{keycap}</kbd>{/if}</span>
   {#each options as o (o.key)}
     <button type="button" role={selected ? undefined : "radio"} class:zero={o.count === 0 && !picked(o.key)} aria-pressed={selected ? picked(o.key) : undefined} aria-checked={selected ? undefined : picked(o.key)} tabindex={selected || picked(o.key) ? 0 : -1} title={o.title} onclick={() => onpick(o.key)} onkeydown={arrow}>{#if selected}<span class="check" aria-hidden="true">✓</span>{/if}{#if o.tone}<i class="dot" data-tone={o.tone}></i>{/if}{o.label}{#if o.count !== undefined}{" "}<b>{o.count}</b>{/if}</button>
@@ -27,7 +27,7 @@
 
 <style>
   .seg { display: inline-flex; flex-wrap: wrap; align-items: center; row-gap: 4px; }
-  .view { flex-wrap: nowrap; }
+  .nowrap { flex-wrap: nowrap; }
   .name { color: var(--muted); font-size: var(--text-sm); margin-right: 8px; }
   button { min-height: 28px; padding: 2px var(--segment-padding-inline, 10px); font-size: var(--text-sm); border-radius: 0; border: 1px solid var(--line-strong); margin-left: -1px; white-space: nowrap; background: var(--card); }
   .name + button { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }

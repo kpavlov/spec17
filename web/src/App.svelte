@@ -5,6 +5,7 @@
   import Markdown from "$lib/ui/Markdown.svelte";
   import Graph from "$lib/views/Graph.svelte";
   import { cycles } from "$lib/requirements/cycles";
+  import { idPrefix } from "$lib/requirements/layout";
   import Split from "$lib/layout/Split.svelte";
   import SplitToggle from "$lib/layout/SplitToggle.svelte";
   import DataTable from "$lib/ui/DataTable.svelte";
@@ -171,7 +172,11 @@
   let rows = $state<Row[]>([]);
   const plain = (t: string) => t.replace(/[`*~]/g, "");
   const requirementCycles = $derived(cycles(rows));
-  const requirementGraph = $derived(rows.map((r) => ({ path: r.id, text: plain(r.text), tests: 0, symbols: { requirement: 1 }, depends_on: r.references.map((id) => ({ module: id, edges: 1 })) })));
+  const requirementGraph = $derived(rows.map((r) => ({ id: r.id, size: 1, links: r.references.map((to) => ({ to, weight: 1 })), data: plain(r.text) })));
+  const requirementTip = (n: { id: string; dependents: number; data: string }) => ({ title: n.id, meta: n.dependents ? `${n.dependents} ${n.dependents === 1 ? "dependent" : "dependents"}` : undefined, detail: n.data });
+  // a module's area is its symbol count; a green ring says its tests were detected
+  const moduleGraph = $derived((modules?.modules ?? []).map((m: any) => ({ id: m.path as string, size: (Object.values(m.symbols) as number[]).reduce((a, b) => a + b, 0), ring: m.tests > 0, links: m.depends_on.map((d: any) => ({ to: d.module as string, weight: d.edges as number })), data: m })));
+  const moduleTip = (n: { id: string; size: number; deg: number; data: any }) => ({ title: n.id, detail: `${n.size} symbols · ${n.data.tests} tests detected · ${n.deg} links` });
   let overlap = $state<any[] | null>(null);
   let uncovered = $state<any>(null);
   let trace = $state<{ text: string; data: any } | null>(null);
@@ -540,7 +545,7 @@
 
 {#snippet viewSeg()}
   <!-- (WEB-49) -->
-  <Seg label="View" options={[...VIEWS, { key: "docs", label: "documents" }]} value={route.view ?? "list"} onpick={(k) => { save("spec17.requirements", (reqView = k)); navigate({ ...route, view: k === "list" ? undefined : k, file: undefined, id: undefined }); }} /> <!-- (WEB-51) -->
+  <Seg label="View" nowrap options={[...VIEWS, { key: "docs", label: "documents" }]} value={route.view ?? "list"} onpick={(k) => { save("spec17.requirements", (reqView = k)); navigate({ ...route, view: k === "list" ? undefined : k, file: undefined, id: undefined }); }} /> <!-- (WEB-51) -->
 {/snippet}
 
 {#snippet requirementToolbar()}
@@ -995,7 +1000,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
       {#if requirementCycles.length}
         <p><b>Circular reference groups:</b> {#each requirementCycles as group}<span class="cycle-group">{"{"}{#each group as id, i}{#if i}{", "}{/if}<a href={u(req(id))}>{id}</a>{/each}{"}"}</span>{/each}</p>
       {:else}<p class="muted">No circular references detected.</p>{/if}
-      <Graph modules={requirementGraph} requirements q={query} cycleGroups={requirementCycles} open={(id) => navigate(req(id))} />
+      <Graph items={requirementGraph} label="requirement reference graph" legend="Arrow: the requirement references the one it points to. Highlighted arrows and rings mark circular references." tip={requirementTip} group={idPrefix} q={query} cycleGroups={requirementCycles} open={(id) => navigate(req(id))} />
     {:else}
     {@render requirementToolbar()}
     <Split showPreview={!!route.id}>
@@ -1068,14 +1073,14 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
         {/if}
       </Filters>
       <span class="muted">{modules?.modules.length ?? 0} modules</span>
-      <Seg label="View" options={VIEWS} value={modView} onpick={(k) => save("spec17.modules", (modView = k))} />
+      <Seg label="View" nowrap options={VIEWS} value={modView} onpick={(k) => save("spec17.modules", (modView = k))} />
     </div>
     {#if modules && !modules.index}<p class="note-line muted">{modules.note}</p>{/if}
     {#if modView === "graph"}
       {#if !modules}<p class="muted">Loading…</p>
       {:else if !modules.index}<!-- the note above says why there is no graph -->
       {:else if !modules.modules.some((m: any) => m.depends_on.length)}<p class="muted empty">No dependencies between modules in the index.</p>
-      {:else}<Graph modules={modules.modules} q={query} open={(p) => navigate({ tab: "modules", module: p })} />{/if}
+      {:else}<Graph items={moduleGraph} label="module dependency graph" legend="Arrow: the module uses the one it points to (width: edge count). Area: symbols. Colour: folder. Green ring: tests detected (not run)." tip={moduleTip} q={query} open={(p) => navigate({ tab: "modules", module: p })} />{/if}
     {:else if mods.length || (showHidden && hiddenMods.length)}
       <table>
         <thead><tr>{@render th("module", "path", modSort)}{@render th("manifest", "manifest", modSort)}{@render th("languages", "languages", modSort)}{@render th("source", "src_files", modSort, "num")}{@render th("test files", "test_files", modSort, "num")}{@render th("tests", "tests", modSort, "num")}{@render th("symbols", "symbols", modSort, "num")}{@render th("depends on", "depends", modSort, "num")}<th></th></tr></thead>

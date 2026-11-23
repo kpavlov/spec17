@@ -4,7 +4,11 @@ export type Tone = "info" | "plum" | "blue" | "celery" | "cyan" | "teal" | "oran
 
 export const requirementLevelTone: Record<string, Tone> = { MUST: "plum", SHALL: "plum", SHOULD: "blue", MAY: "celery" };
 // (WEB-57) metadata colors are hints, not evidence states
-export const priorityTone = (priority: string): Tone => ({ P0: "red", P1: "orange", P2: "blue", P3: "indigo" })[priority.toUpperCase()] as Tone ?? "muted";
+// P0 hottest, then by number; anything else (a custom pattern's value) stays muted
+export const priorityTone = (priority: string): Tone => {
+  const n = /^P(\d+)$/i.exec(priority)?.[1];
+  return n === undefined ? "muted" : (["red", "orange", "blue"] as Tone[])[+n] ?? "indigo";
+};
 export const effortTone = (effort: string): Tone => ({ XXXS: "cyan", XXS: "cyan", XS: "cyan", S: "teal", M: "blue", L: "orange", XL: "red", XXL: "red", XXXL: "red" })[effort.toUpperCase()] as Tone ?? "muted";
 
 // what the scanner saw per requirement state

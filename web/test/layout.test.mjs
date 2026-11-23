@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { components, prefixForce, reduceCrossings, separate } from "../src/lib/requirements/layout.ts";
+import { components, idPrefix, prefixForce, reduceCrossings, separate } from "../src/lib/requirements/layout.ts";
 
 // [WEB-48] Two crossing edges can be untangled by swapping their endpoints.
 test("reduces crossings without changing the set of node positions", () => {
@@ -43,4 +43,9 @@ test("separates linked clusters with matching prefixes", () => {
   const b = [{ id: "API-03", x: 0, y: 0, r: 8 }, { id: "API-04", x: 30, y: 0, r: 8 }];
   separate([a, b], 60, (n) => n.id.split("-")[0]);
   for (const x of a) for (const y of b) assert.ok(Math.hypot(x.x - y.x, x.y - y.y) > x.r + y.r + 60);
+});
+
+// [WEB-53] A requirement ID belongs to the group of its prefix, with either separator.
+test("takes the prefix of an ID", () => {
+  assert.deepEqual(["AC-1.2", "REQ_001", "FR-001", "X"].map(idPrefix), ["AC", "REQ", "FR", "X"]);
 });

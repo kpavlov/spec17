@@ -3,6 +3,9 @@ import { forceCollide, forceSimulation, forceX, forceY, type Force, type Simulat
 type Point = { x: number; y: number };
 type Edge<T> = { source: T; target: T };
 
+// (WEB-53) The prefix of a requirement ID: `AC-1.2` and `REQ_001` belong to `AC` and `REQ`.
+export const idPrefix = (id: string): string => id.split(/[-_]/, 1)[0];
+
 // (WEB-53) Pull each node gently towards the center of its prefix peers.
 export function prefixForce<T extends SimulationNodeDatum>(keys: (node: T) => string[]): Force<T, undefined> {
   let nodes: T[] = [];
