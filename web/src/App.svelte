@@ -12,7 +12,7 @@
   import { MediaQuery } from "svelte/reactivity";
   import { levelPills } from "$lib/requirements/levelPills";
   import RequirementBadges from "$lib/requirements/RequirementBadges.svelte";
-  import { readValues, writeValues, pickValue, matches, type Value } from "$lib/requirements/filters";
+  import { readValues, writeValues, pickValue, collapseAll, matches, type Value } from "$lib/requirements/filters";
   import Filters from "$lib/ui/Filters.svelte";
   import Seg from "$lib/ui/Seg.svelte";
   import FileTree from "$lib/ui/FileTree.svelte";
@@ -108,7 +108,7 @@
         e.preventDefault();
         if (inDocs || (route.tab !== "requirements" && route.tab !== "changes")) navigate({ tab: "requirements" });
         queueMicrotask(() => document.querySelector<HTMLInputElement>("input[name=filter]")?.focus());
-      } else if ((route.tab === "requirements" || route.tab === "changes") && e.key.toLowerCase() === "f") {
+      } else if ((route.tab === "requirements" || route.tab === "changes") && e.key.toLowerCase() === "f" && hasFilters) {
         e.preventDefault(); setReqFiltersOpen(true); tick().then(() => document.querySelector<HTMLInputElement>(".req-options button")?.focus());
       } else if (document.querySelector(".req-toolbar .filter-toggle") && /^[0-7slpecr]$/i.test(e.key)) {
         const k = e.key.toLowerCase();
@@ -116,7 +116,7 @@
         if (k === "0") navigate({ ...route, ...clearReqFilters });
         else if (field) {
           const choices = options(field);
-          if (choices.length === 1) return;
+          if (!actionable(field, choices)) return;
           const values = selected(field);
           const index = values.length ? choices.findIndex((choice) => choice.key === JSON.stringify(values[0])) : 0;
           const next = choices[(index + (e.shiftKey ? -1 : 1) + choices.length) % choices.length];
@@ -437,8 +437,12 @@
     }
     return [{ key: "", label: "All", count: eligible.length }, ...values.map((value) => ({ key: JSON.stringify(value), label: optionLabel(key, value), count: counts.get(value) ?? 0, tone: optionTone(key, value), title: key === "state" && value ? STATE_HINT[value] : undefined }))];
   };
-  // (WEB-60) a plain click selects only that value; a modifier click (and a chip's ×) adds or removes it
-  const pickFacet = (key: Facet, value: Value, additive = true) => navigate({ ...route, [key]: writeValues(pickValue(selected(key), value, additive)) });
+  // (WEB-61) a field is shown while it offers a choice (All plus two values) or holds a selection to clear; its shortcut is the same
+  const actionable = (key: Facet, choices = options(key)) => choices.length > 2 || selected(key).length > 0;
+  // (WEB-61) with no field to show, the Filters button is disabled and the panel stays closed (the remembered open state is kept)
+  const hasFilters = $derived(facets.some((key) => actionable(key)));
+  // (WEB-60) a plain click selects only that value; a modifier click (and a chip's ×) adds or removes it; every value selected is All
+  const pickFacet = (key: Facet, value: Value, additive = true) => navigate({ ...route, [key]: writeValues(collapseAll(pickValue(selected(key), value, additive), options(key).slice(1).map((o) => JSON.parse(o.key)))) });
   const clearFacet = (key: Facet) => navigate({ ...route, [key]: undefined });
   const editFacet = (key: Facet) => { setReqFiltersOpen(true); tick().then(() => document.querySelector<HTMLButtonElement>(`[data-facet="${key}"] button[aria-pressed=true]`)?.focus()); };
   // the modules table sorts here; the requirement, test and spec lists sort inside DataTable
@@ -553,18 +557,18 @@
   <!-- (WEB-33, WEB-43, WEB-59) -->
   <div class="bar req-toolbar">
     <input name="filter" aria-label={onChanges ? "Search affected requirements" : "Search requirements"} placeholder="Search requirements…" title="Search by ID, text or file (/)" value={query} oninput={(e) => filter({ q: e.currentTarget.value })} />
-    <button type="button" class="filter-toggle" aria-expanded={reqFiltersOpen} aria-controls="requirement-filter-options" title="Filter requirements (F)" onclick={() => setReqFiltersOpen(!reqFiltersOpen)}>Filters{activeReqFilters ? ` (${activeReqFilters})` : ""}</button>
+    <button type="button" class="filter-toggle" disabled={!hasFilters} aria-expanded={hasFilters && reqFiltersOpen} aria-controls="requirement-filter-options" aria-label={activeReqFilters ? `Filters, ${activeReqFilters} active` : "Filters"} title={hasFilters ? "Filter requirements (F)" : "Nothing to filter by: every requirement has the same values"} onclick={() => setReqFiltersOpen(!reqFiltersOpen)}><Icon name="filter" />{#if activeReqFilters}<span class="n">{activeReqFilters}</span>{/if}</button>
     <span class="found muted nowrap" aria-live="polite">{shown.length} of {reqFilterRows.length}</span>
     {#if filtering}<a class="clear-filters" href={u({ ...route, ...clearReqFilters })} aria-label="Clear requirement filters" title="Clear requirement filters (0)">Clear</a>{/if}
     {#if route.tab === "requirements"}{@render viewSeg()}{/if}
     {#if !onChanges && route.id}<SplitToggle />{/if}
   </div>
-  <div class="req-options" id="requirement-filter-options" hidden={!reqFiltersOpen}>
+  <div class="req-options" id="requirement-filter-options" hidden={!reqFiltersOpen || !hasFilters}>
     {#if reqFiltersOpen}
       {#each facets as key}
         {@const values = selected(key)}
         {@const choices = options(key)}
-        {#if choices.length > 1}
+        {#if actionable(key, choices)}
         <div data-facet={key}>
           <Seg label={facetLabels[key]} keycap={facetShortcuts[key]} hint={`Click selects one; Shift, Ctrl or ⌘ + click adds or removes. ${facetShortcuts[key]} for next choice, Shift+${facetShortcuts[key]} for previous`} options={choices} selected={values.length ? values.map((value) => JSON.stringify(value)) : [""]} onpick={(value, additive) => value ? pickFacet(key, JSON.parse(value), additive) : values.length && clearFacet(key)} />
         </div>
@@ -1386,7 +1390,8 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
   .doc { flex: 1; min-width: 0; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px 14px; box-shadow: var(--shadow); }
   .docs { display: flex; flex: 1; min-height: 0; gap: var(--gap); }
   .tree { flex: 0 0 15rem; min-height: 0; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-  .filter-toggle[aria-pressed=true] { background: var(--tint-on); color: var(--accent); }
+  .filter-toggle:is([aria-pressed=true], [aria-expanded=true]) { background: var(--tint-on); color: var(--accent); }
+  .filter-toggle .n { font-variant-numeric: tabular-nums; font-weight: var(--weight-semibold); color: var(--accent); }
   @media (max-width: 62rem) { .docs { flex-direction: column; } .tree { flex-basis: auto; max-height: 12rem; } }
   .badges { margin-top: 3px; }
   .notes { margin-top: 3px; font-size: var(--text-sm); line-height: 1.6; }

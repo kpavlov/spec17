@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readValues, writeValues, toggleValue, pickValue, matches } from "../src/lib/requirements/filters.ts";
+import { readValues, writeValues, toggleValue, pickValue, collapseAll, matches } from "../src/lib/requirements/filters.ts";
 import { format, parse } from "../src/lib/router.ts";
 
 // [WEB-59] Multiple values and unset round-trip without colliding with literal effort text.
@@ -25,6 +25,11 @@ test("a plain click selects one value and a modifier click edits the set", () =>
   assert.deepEqual(pickValue(["P0"], "P1", true), ["P0", "P1"]);
   assert.deepEqual(pickValue(["P0", "P1"], "P0", true), ["P1"]);
   assert.deepEqual(pickValue(["P1"], "P1", true), []);
+  // selecting every choice is the same as All; a lone choice stays selectable
+  assert.deepEqual(collapseAll(["P0", "P1"], ["P0", "P1"]), []);
+  assert.deepEqual(collapseAll([null, "P0", "P1"], ["P0", "P1", null]), []);
+  assert.deepEqual(collapseAll(["P0"], ["P0", "P1"]), ["P0"]);
+  assert.deepEqual(collapseAll(["P0"], ["P0"]), ["P0"]);
 });
 
 // [WEB-59] Values within a facet are alternatives; different facets must all match.

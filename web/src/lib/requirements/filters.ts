@@ -19,6 +19,10 @@ export function toggleValue(values: Value[], value: Value): Value[] {
   return values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
 }
 // A click on a choice: it alone (or none, when it already is the only one), or added to / removed from the rest with a modifier key.
+// Every choice selected filters nothing, so it reads as "All" (no values). A field with one choice can still be pinned to it.
+export function collapseAll(values: Value[], choices: Value[]): Value[] {
+  return values.length > 1 && choices.every((c) => values.includes(c)) ? [] : values;
+}
 export function pickValue(values: Value[], value: Value, additive: boolean): Value[] {
   if (additive) return toggleValue(values, value);
   return values.length === 1 && values[0] === value ? [] : [value];

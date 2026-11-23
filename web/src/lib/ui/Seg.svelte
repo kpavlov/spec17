@@ -1,6 +1,7 @@
 <script lang="ts">
   import { tick } from "svelte";
   import type { Tone } from "$lib/tone";
+  import { additive, step } from "./seg";
 
   type Opt = { key: string; label: string; count?: number; tone?: Tone; title?: string };
   // Single-choice groups select with arrows. Multi-choice groups use toggle buttons; a click with Shift, Ctrl or ⌘ held says `additive`.
@@ -12,8 +13,7 @@
     const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!d || selected) return;
     e.preventDefault();
-    const keys = options.map((o) => o.key);
-    onpick(keys[(keys.indexOf(value ?? "") + d + keys.length) % keys.length]);
+    onpick(step(options.map((o) => o.key), value, d));
     tick().then(() => bar?.querySelector<HTMLElement>("[aria-checked=true]")?.focus());
   }
 </script>
@@ -21,7 +21,7 @@
 <div class="seg" class:nowrap role={selected ? "group" : "radiogroup"} aria-label={label} title={hint} bind:this={bar}>
   <span class="name" aria-hidden="true">{label}{#if keycap}{" "}<kbd>{keycap}</kbd>{/if}</span>
   {#each options as o (o.key)}
-    <button type="button" role={selected ? undefined : "radio"} class:zero={o.count === 0 && !picked(o.key)} aria-pressed={selected ? picked(o.key) : undefined} aria-checked={selected ? undefined : picked(o.key)} tabindex={selected || picked(o.key) ? 0 : -1} title={o.title} onclick={(e) => onpick(o.key, e.shiftKey || e.ctrlKey || e.metaKey)} onkeydown={arrow}>{#if selected}<span class="check" aria-hidden="true">✓</span>{/if}{#if o.tone}<i class="dot" data-tone={o.tone}></i>{/if}<span class="text" data-text={o.label}>{o.label}</span>{#if o.count !== undefined}{" "}<b>{o.count}</b>{/if}</button>
+    <button type="button" role={selected ? undefined : "radio"} class:zero={o.count === 0 && !picked(o.key)} aria-pressed={selected ? picked(o.key) : undefined} aria-checked={selected ? undefined : picked(o.key)} tabindex={selected || picked(o.key) ? 0 : -1} title={o.title} onclick={(e) => onpick(o.key, additive(e))} onkeydown={arrow}>{#if selected}<span class="check" aria-hidden="true">✓</span>{/if}{#if o.tone}<i class="dot" data-tone={o.tone}></i>{/if}<span class="text" data-text={o.label}>{o.label}</span>{#if o.count !== undefined}{" "}<b>{o.count}</b>{/if}</button>
   {/each}
 </div>
 
