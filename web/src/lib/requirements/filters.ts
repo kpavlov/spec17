@@ -18,6 +18,11 @@ export function writeValues(values: Value[]): string | undefined {
 export function toggleValue(values: Value[], value: Value): Value[] {
   return values.includes(value) ? values.filter((v) => v !== value) : [...values, value];
 }
+// A click on a choice: it alone (or none, when it already is the only one), or added to / removed from the rest with a modifier key.
+export function pickValue(values: Value[], value: Value, additive: boolean): Value[] {
+  if (additive) return toggleValue(values, value);
+  return values.length === 1 && values[0] === value ? [] : [value];
+}
 
 export function matches(values: Value[], value: Value): boolean {
   return !values.length || values.includes(value);

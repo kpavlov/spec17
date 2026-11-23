@@ -12,7 +12,7 @@
   import { MediaQuery } from "svelte/reactivity";
   import { levelPills } from "$lib/requirements/levelPills";
   import RequirementBadges from "$lib/requirements/RequirementBadges.svelte";
-  import { readValues, writeValues, toggleValue, matches, type Value } from "$lib/requirements/filters";
+  import { readValues, writeValues, pickValue, matches, type Value } from "$lib/requirements/filters";
   import Filters from "$lib/ui/Filters.svelte";
   import Seg from "$lib/ui/Seg.svelte";
   import FileTree from "$lib/ui/FileTree.svelte";
@@ -437,7 +437,8 @@
     }
     return [{ key: "", label: "All", count: eligible.length }, ...values.map((value) => ({ key: JSON.stringify(value), label: optionLabel(key, value), count: counts.get(value) ?? 0, tone: optionTone(key, value), title: key === "state" && value ? STATE_HINT[value] : undefined }))];
   };
-  const pickFacet = (key: Facet, value: Value) => navigate({ ...route, [key]: writeValues(toggleValue(selected(key), value)) });
+  // (WEB-60) a plain click selects only that value; a modifier click (and a chip's ×) adds or removes it
+  const pickFacet = (key: Facet, value: Value, additive = true) => navigate({ ...route, [key]: writeValues(pickValue(selected(key), value, additive)) });
   const clearFacet = (key: Facet) => navigate({ ...route, [key]: undefined });
   const editFacet = (key: Facet) => { setReqFiltersOpen(true); tick().then(() => document.querySelector<HTMLButtonElement>(`[data-facet="${key}"] button[aria-pressed=true]`)?.focus()); };
   // the modules table sorts here; the requirement, test and spec lists sort inside DataTable
@@ -565,7 +566,7 @@
         {@const choices = options(key)}
         {#if choices.length > 1}
         <div data-facet={key}>
-          <Seg label={facetLabels[key]} keycap={facetShortcuts[key]} hint={`${facetShortcuts[key]} for next choice, Shift+${facetShortcuts[key]} for previous`} options={choices} selected={values.length ? values.map((value) => JSON.stringify(value)) : [""]} onpick={(value) => value ? pickFacet(key, JSON.parse(value)) : values.length && clearFacet(key)} />
+          <Seg label={facetLabels[key]} keycap={facetShortcuts[key]} hint={`Click selects one; Shift, Ctrl or ⌘ + click adds or removes. ${facetShortcuts[key]} for next choice, Shift+${facetShortcuts[key]} for previous`} options={choices} selected={values.length ? values.map((value) => JSON.stringify(value)) : [""]} onpick={(value, additive) => value ? pickFacet(key, JSON.parse(value), additive) : values.length && clearFacet(key)} />
         </div>
         {/if}
       {/each}

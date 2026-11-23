@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readValues, writeValues, toggleValue, matches } from "../src/lib/requirements/filters.ts";
+import { readValues, writeValues, toggleValue, pickValue, matches } from "../src/lib/requirements/filters.ts";
 import { format, parse } from "../src/lib/router.ts";
 
 // [WEB-59] Multiple values and unset round-trip without colliding with literal effort text.
@@ -12,6 +12,19 @@ test("filter values survive share links and can be removed", () => {
   assert.deepEqual(readValues("all"), ["all"]);
   assert.deepEqual(toggleValue([null, "M"], null), ["M"]);
   assert.equal(writeValues([]), undefined);
+});
+
+// [WEB-60] A plain click replaces the selection, a modifier click adds or removes one value.
+test("a plain click selects one value and a modifier click edits the set", () => {
+  assert.deepEqual(pickValue([], "P1", false), ["P1"]);
+  assert.deepEqual(pickValue(["P0"], "P1", false), ["P1"]);
+  assert.deepEqual(pickValue(["P0", "P1"], "P1", false), ["P1"]);
+  assert.deepEqual(pickValue(["P1"], "P1", false), []);
+  assert.deepEqual(pickValue([null], null, false), []);
+  assert.deepEqual(pickValue([], "P1", true), ["P1"]);
+  assert.deepEqual(pickValue(["P0"], "P1", true), ["P0", "P1"]);
+  assert.deepEqual(pickValue(["P0", "P1"], "P0", true), ["P1"]);
+  assert.deepEqual(pickValue(["P1"], "P1", true), []);
 });
 
 // [WEB-59] Values within a facet are alternatives; different facets must all match.
