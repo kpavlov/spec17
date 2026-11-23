@@ -31,16 +31,21 @@ pub struct Profile {
     pub name: String,
     pub ext: Vec<String>,
     pub comment: Vec<String>,
-    pub decl: String,
-    pub assert: String,
-    pub off: String,
+    #[serde(deserialize_with = "patterns")]
+    pub decl: Vec<String>,
+    #[serde(deserialize_with = "patterns")]
+    pub assert: Vec<String>,
+    #[serde(deserialize_with = "patterns")]
+    pub off: Vec<String>,
     /// Repo-relative path of a test file, also when it sits next to the code (`a_test.go`, `a.test.ts`).
-    pub test: String,
+    #[serde(deserialize_with = "patterns")]
+    pub test: Vec<String>,
     /// Tests live in the source files too (Rust `mod tests`).
     #[serde(default)]
     pub inline: bool,
     /// A line that opens a test case (an attribute, annotation, call or declaration).
-    pub case: String,
+    #[serde(deserialize_with = "patterns")]
+    pub case: Vec<String>,
     /// `case` matches a call such as `it("name", ...)` (the name is its quoted string) rather than a marker above a declaration.
     #[serde(default)]
     pub call: bool,
@@ -49,9 +54,16 @@ pub struct Profile {
 impl Profile {
     /// An ecosystem spec17 knows nothing about: no files, no comments, regexes that match nothing.
     pub fn unknown(name: &str) -> Profile {
-        let n = || NEVER.to_string();
+        let n = || vec![NEVER.to_string()];
         Profile { name: name.into(), ext: vec![], comment: vec![], decl: n(), assert: n(), off: n(), test: n(), inline: false, case: n(), call: false }
     }
+}
+
+fn patterns<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Vec<String>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum OneOrMany { One(String), Many(Vec<String>) }
+    Ok(match OneOrMany::deserialize(d)? { OneOrMany::One(s) => vec![s], OneOrMany::Many(v) => v })
 }
 
 #[derive(Deserialize)]
@@ -392,8 +404,8 @@ fn minimal(mut v: Vec<String>) -> Vec<String> {
 pub fn layout<'a>(profiles: &'a [Profile], files: &[String]) -> Option<Layout<'a>> {
     let mine: Vec<&String> = files.iter().filter(|f| !f.split('/').any(|c| c.starts_with('.') && c != "." || SKIP.contains(&c))).collect();
     let (profile, _) = profiles.iter().map(|p| (p, mine.iter().filter(|f| p.ext.iter().any(|e| e == ext_of(f))).count())).fold(None, |best: Option<(&Profile, usize)>, c| if c.1 > best.map_or(0, |b| b.1) { Some(c) } else { best })?;
-    let test = Regex::new(&profile.test).unwrap();
-    let (tests, src): (Vec<&String>, Vec<&String>) = mine.into_iter().filter(|f| profile.ext.iter().any(|e| e == ext_of(f))).partition(|f| test.is_match(f));
+    let test: Vec<Regex> = profile.test.iter().map(|p| Regex::new(p).unwrap()).collect();
+    let (tests, src): (Vec<&String>, Vec<&String>) = mine.into_iter().filter(|f| profile.ext.iter().any(|e| e == ext_of(f))).partition(|f| test.iter().any(|r| r.is_match(f)));
     let src_dirs = minimal(src.iter().map(|f| src_root(f)).collect());
     let mut test_dirs: Vec<String> = tests.iter().filter_map(|f| test_root(f)).collect();
     if profile.inline {

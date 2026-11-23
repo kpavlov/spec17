@@ -169,6 +169,8 @@ pub struct Report {
     pub unproven: Vec<Unproven>,
     pub built: Vec<String>,
     pub invalid_tests: IndexMap<String, Vec<TestProblem>>,
+    /// IDs tagged in comments attached to detected tests; evidence, not an invalidity.
+    pub comment_tagged: Vec<TestProblem>,
     pub spec_issues: Vec<String>,
     pub dangling_tests: Vec<String>,
     pub dangling_sources: Vec<String>,
@@ -189,7 +191,9 @@ impl Analysis {
             let s = &self.s[&i];
             Unproven { verdict: self.verdict(&i).into(), file: s.file.clone(), line: s.line, text: s.text.clone(), id: i }
         }).collect();
-        let invalid_tests: IndexMap<String, Vec<TestProblem>> = self.p.test_problems(&self.s, &self.t).into_iter().map(|(k, v)| (k.to_string(), v.into_iter().map(|(id, file, line)| TestProblem { id, file, line }).collect())).collect();
+        let mut invalid_tests: IndexMap<String, Vec<TestProblem>> = self.p.test_problems(&self.s, &self.t, self.graph.as_ref()).into_iter().map(|(k, v)| (k.to_string(), v.into_iter().map(|(id, file, line)| TestProblem { id, file, line }).collect())).collect();
+        // (SCAN-36) Comment tags are useful evidence, not problems.
+        let comment_tagged = invalid_tests.shift_remove("comment-tagged").unwrap_or_default();
         let (dt, ds) = (self.p.dangling(&self.s, &self.t), self.p.dangling(&self.s, &self.c));
         let overlaps: Vec<OverlapRow> = self.overlap("", false).ok().flatten().unwrap_or_default().into_iter().filter(|r| !r.pairs.iter().all(|p| p.2)).collect();
         let uncovered = self.uncovered("", 5, 10).ok().flatten();
@@ -225,6 +229,7 @@ impl Analysis {
             unproven,
             built,
             invalid_tests,
+            comment_tagged,
             spec_issues: self.issues.iter().map(Issue::to_string).collect(),
             dangling_tests: dt,
             dangling_sources: ds,
@@ -281,6 +286,7 @@ impl Report {
         }).collect();
         let tests_bad: usize = self.invalid_tests.values().map(Vec::len).sum();
         section(&mut o, "invalid tests", tests_bad, bt, "unknown/retired = fix the tag; comment-only = no test carries it; disabled = switched off; no-assert = no direct assertion, verify");
+        section(&mut o, "comment-tagged", self.comment_tagged.len(), self.comment_tagged.iter().map(|p| format!("  {} ({}:{})", p.id, p.file, p.line)).collect(), "comment attached to a detected test; verify the evidence");
         let app = a.app();
         section(&mut o, "specs to compare: code covered by 2+ requirements that do not cite each other", self.overlaps.len(),
             self.overlaps.iter().map(|r| format!("  {}:{} {}  [{}]", r.file.strip_prefix(&app).unwrap_or(&r.file), r.line, r.name, r.ids.join(", "))).collect(),

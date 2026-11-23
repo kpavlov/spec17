@@ -2,6 +2,7 @@
 # To support a new language, append a [[profile]] table; nothing else needs to change.
 # A repo can do the same without a rebuild: `profiles` in spec17.json takes entries of this shape (JSON), and one named
 # like a profile here changes only the fields it sets.
+# Regex fields accept a string or an ordered list; the first pattern matching each input wins.
 # Regexes are TOML literal strings ('...'): write them as-is, no escaping (use \x27 for a single quote).
 #
 #   name     ecosystem name (shown in the UI)
@@ -19,11 +20,11 @@
 name = "swift"
 ext = ["swift"]
 comment = ["//"]
-decl = '^\s*(?:(?:public|internal|private|fileprivate|final|nonisolated|indirect|static)\s+)*(?:struct|class|enum|actor|protocol|extension|func|typealias)\s+([A-Za-z_]\w*)'
+decl = '^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:(?:public|internal|private|fileprivate|final|nonisolated|indirect|static)\s+)*(?:struct|class|enum|actor|protocol|extension|func|typealias)\s+(`[^`]+`|[A-Za-z_]\w*)'
 assert = '#expect|#require|XCTAssert|XCTFail|XCTUnwrap|Issue\.record|confirmation\('
 off = '\.disabled\(|\.enabled\(if: false|XCTSkip'
 test = '(^|/)[^/]*Tests?(/|\.swift$)'
-case = '^\s*@Test\b|^\s*(?:@\w+\s+)*func\s+test\w*'
+case = '^\s*(?:@Test\b|(?:@\w+(?:\([^)]*\))?\s+)*func\s+(?:test\w*|`test[^`]*`))'
 
 [[profile]]
 name = "rust"

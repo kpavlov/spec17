@@ -190,22 +190,31 @@ pub type Refs = HashMap<String, Vec<Ref>>;
 // (SCAN-33)
 pub struct Lang {
     pub comment: Vec<String>,
-    pub decl: Regex,
-    assert: Regex,
-    off: Regex,
+    pub decl: Patterns,
+    assert: Patterns,
+    off: Patterns,
     /// None when `spec17.json` lists both `src` and `tests` and does not set this profile's `test`: the folders say it all.
-    test: Option<Regex>,
-    pub(crate) case: Regex,
+    test: Option<Patterns>,
+    pub(crate) case: Patterns,
     /// `case` matches a call: the name is its quoted string.
     pub(crate) call: bool,
 }
 
+pub struct Patterns(Vec<Regex>);
+
+impl Patterns {
+    fn is_match(&self, text: &str) -> bool { self.0.iter().any(|r| r.is_match(text)) }
+    pub(crate) fn captures<'a>(&self, text: &'a str) -> Option<regex::Captures<'a>> { self.0.iter().find_map(|r| r.captures(text)) }
+}
+
 impl Lang {
     fn new(p: &detect::Profile, test: bool) -> Result<Lang, String> {
-        let r = |s: &str| Regex::new(s).map_err(|e| format!("profile {}: bad regex {s}: {e}", p.name));
+        let r = |patterns: &[String]| patterns.iter().map(|s| Regex::new(s).map_err(|e| format!("profile {}: bad regex {s}: {e}", p.name))).collect::<Result<Vec<_>, _>>().map(Patterns);
         let decl = r(&p.decl)?;
-        if decl.captures_len() < 2 && p.decl != detect::NEVER {
-            return Err(format!("profile {}: decl {} needs a capture group 1 for the declared name", p.name, p.decl));
+        for (s, regex) in p.decl.iter().zip(&decl.0) {
+            if regex.captures_len() < 2 && s != detect::NEVER {
+                return Err(format!("profile {}: decl {} needs a capture group 1 for the declared name", p.name, s));
+            }
         }
         Ok(Lang { comment: p.comment.clone(), decl, assert: r(&p.assert)?, off: r(&p.off)?, test: if test { Some(r(&p.test)?) } else { None }, case: r(&p.case)?, call: p.call })
     }
@@ -605,14 +614,17 @@ impl Project {
     }
 
     // (SCAN-35) The marker, declaration, attached header start and exclusive body end.
-    pub(crate) fn test_ranges(&self, file: &str) -> Vec<(usize, usize, usize, usize)> {
+    pub(crate) fn test_ranges(&self, file: &str, graph: Option<&Graph>) -> Vec<(usize, usize, usize, usize)> {
         let lang = self.lang(file);
         let ls = self.lines(file);
+        let fresh = self.root.join(&self.cfg.codegraph).metadata().and_then(|m| m.modified()).ok()
+            .zip(self.root.join(file).metadata().and_then(|m| m.modified()).ok()).is_some_and(|(index, source)| index >= source);
+        let decls = if fresh && !lang.call { graph.and_then(|g| g.test_decls_in(file).ok()).unwrap_or_default() } else { vec![] };
         let mut ranges = Vec::new();
         for (m, line) in ls.iter().enumerate() {
-            let opens = lang.case.find_iter(line).any(|f| {
+            let opens = lang.case.0.iter().find(|r| r.is_match(line)).is_some_and(|r| r.find_iter(line).any(|f| {
                 lang.call || (line[..f.start()].matches('"').count() - line[..f.start()].matches("\\\"").count()) % 2 == 0
-            });
+            }));
             if !opens || lang.is_comment(line.trim_start()) { continue; }
             let at = if lang.call { m } else {
                 (m..ls.len()).take_while(|&i| {
@@ -626,17 +638,24 @@ impl Project {
                 l.len() - text.len() == indent && (lang.is_comment(text) || text.starts_with('@') || text.starts_with("#[")
                     || ['[', '<'].into_iter().any(|c| line.trim_start().starts_with(c) && text.starts_with(c)))
             }).count();
-            let end = if file.ends_with(".py") {
+            let indexed = decls.iter().filter(|&&(lo, hi)| lo >= (m - leading) as i64 + 1 && lo <= at as i64 + 1 && hi >= at as i64 + 1 && hi <= ls.len() as i64)
+                .min_by_key(|&&(lo, hi)| hi - lo).map(|&(_, hi)| hi as usize);
+            let end = if let Some(end) = indexed { end } else if file.ends_with(".py") {
                 let decl_indent = ls[at].len() - ls[at].trim_start().len();
                 (at + 1..ls.len()).find(|&i| {
                     let text = ls[i].trim_start();
                     !text.is_empty() && ls[i].len() - text.len() <= decl_indent
                 }).unwrap_or(ls.len())
+            } else if ["rb", "lua", "luau", "erl", "vb", "pas", "dpr", "sql"].iter().any(|ext| file.to_ascii_lowercase().ends_with(&format!(".{ext}"))) {
+                test_block_end(&ls, at, file)
             } else {
-                // shortcut: non-Python bodies use braces, add language-aware boundaries for other block syntax.
                 at + body(&ls, at + 1, ls.len() - at).len()
             };
             ranges.push((m, at, m - leading, end));
+        }
+        for i in 0..ranges.len().saturating_sub(1) {
+            let next = ranges[i + 1].2;
+            if next > ranges[i].1 { ranges[i].3 = ranges[i].3.min(next); }
         }
         ranges
     }
@@ -736,12 +755,12 @@ impl Project {
     /// Tagged tests that prove nothing: kind -> [(id, file, line)], in a fixed kind order.
     /// unknown = ID in no spec; retired = struck-through spec; comment-only = every tag of the ID sits in a comment;
     /// disabled = every test is switched off; no-assert = no tagged test body has a direct assertion (it may assert through a helper: verify).
-    pub fn test_problems(&self, s: &IndexMap<String, Spec>, t: &Refs) -> Vec<(&'static str, Vec<(String, String, usize)>)> {
+    pub fn test_problems(&self, s: &IndexMap<String, Spec>, t: &Refs, graph: Option<&Graph>) -> Vec<(&'static str, Vec<(String, String, usize)>)> {
         let gone: std::collections::HashSet<String> = self.retired().into_iter().collect();
-        let mut out: Vec<(&'static str, Vec<(String, String, usize)>)> = ["unknown", "retired", "comment-only", "disabled", "no-assert"].into_iter().map(|k| (k, vec![])).collect();
+        let mut out: Vec<(&'static str, Vec<(String, String, usize)>)> = ["unknown", "retired", "comment-only", "comment-tagged", "disabled", "no-assert"].into_iter().map(|k| (k, vec![])).collect();
         let slot = |out: &mut Vec<(&'static str, Vec<_>)>, k: &str, v| out.iter_mut().find(|(n, _)| *n == k).unwrap().1.push(v);
         let mut ids: Vec<&String> = t.keys().collect();
-        let ranges: std::collections::HashMap<_, _> = self.test_files().iter().map(|f| (f.as_str(), self.test_ranges(f))).collect();
+        let ranges: std::collections::HashMap<_, _> = self.test_files().iter().map(|f| (f.as_str(), self.test_ranges(f, graph))).collect();
         ids.sort();
         for i in ids {
             let refs = &t[i];
@@ -751,6 +770,10 @@ impl Project {
             } else if !s.contains_key(i) {
                 slot(&mut out, "unknown", first);
             } else {
+                // (SCAN-36) Preserve the actual comment location when an ID has several tags.
+                if let Some(r) = refs.iter().find(|r| self.flag(r, "comment-tagged", &ranges[r.file.as_str()])) {
+                    slot(&mut out, "comment-tagged", (i.clone(), r.file.clone(), r.line));
+                }
                 for kind in ["comment-only", "disabled", "no-assert"] {
                     if refs.iter().all(|r| self.flag(r, kind, &ranges[r.file.as_str()])) {
                         slot(&mut out, kind, first.clone());
@@ -769,6 +792,7 @@ impl Project {
         let case = ranges.iter().copied().filter(|&(_, _, head, end)| head <= start && start < end).last();
         match kind {
             "comment-only" => comment && case.is_none(),
+            "comment-tagged" => comment && case.is_some(),
             "disabled" => {
                 if let Some((_, at, head, _)) = case {
                     ls[head..=at].iter().any(|x| lang.off.is_match(x))
@@ -828,15 +852,98 @@ pub fn sorted_ids<'a>(ids: impl IntoIterator<Item = &'a String>) -> Vec<String> 
     v
 }
 
+// (SCAN-35) Common block endings for test languages that do not use braces.
+// shortcut: language-specific quoting and unusual SQL bodies need parsers when exact boundaries are required.
+fn test_block_end(ls: &[String], start: usize, file: &str) -> usize {
+    static VB: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(r"(?i)^end\s+(?:sub|function)\b").unwrap());
+    static DOLLAR: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(r"\$(?:[A-Za-z_][A-Za-z_0-9]*)?\$").unwrap());
+    static TOKEN: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| Regex::new(r#""(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|--.*|//.*|\#.*|[A-Za-z_][A-Za-z_0-9]*"#).unwrap());
+    let ext = file.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
+    let (mut dollar, mut depth, mut opened) = (None::<String>, 0i32, false);
+    for (i, line) in ls.iter().enumerate().skip(start) {
+        let t = line.trim();
+        let end = match ext.as_str() {
+            "rb" | "lua" | "luau" | "pas" | "dpr" => {
+                let words: Vec<_> = TOKEN.find_iter(t).map(|w| w.as_str()).take_while(|w| !w.starts_with('#') && !w.starts_with("--") && !w.starts_with("//")).filter(|w| !w.starts_with(['\'', '"'])).map(str::to_ascii_lowercase).collect();
+                for (pos, word) in words.iter().enumerate() {
+                    let opens = match ext.as_str() {
+                        "rb" => word == "do" && !words.first().is_some_and(|w| matches!(w.as_str(), "while" | "until" | "for")) || pos == 0 && matches!(word.as_str(), "def" | "if" | "unless" | "case" | "begin" | "while" | "until" | "for" | "class" | "module"),
+                        "lua" | "luau" => matches!(word.as_str(), "function" | "do" | "repeat") || word == "then" && words.first().is_none_or(|w| w != "elseif"),
+                        _ => matches!(word.as_str(), "begin" | "case" | "try" | "record"),
+                    };
+                    if opens { depth += 1; opened = true; }
+                    if word == "end" || (matches!(ext.as_str(), "lua" | "luau") && word == "until") { depth -= 1; }
+                }
+                opened && depth <= 0
+            },
+            "vb" => VB.is_match(t),
+            "erl" => !t.starts_with('%') && t.ends_with('.'),
+            "sql" => {
+                let mut closed = false;
+                for m in DOLLAR.find_iter(line.split("--").next().unwrap_or("")) {
+                    match &dollar {
+                        Some(tag) if tag == m.as_str() => { closed = true; break; }
+                        None => dollar = Some(m.as_str().to_string()),
+                        _ => {},
+                    }
+                }
+                if dollar.is_none() {
+                    for word in TOKEN.find_iter(t).map(|w| w.as_str()).take_while(|w| !w.starts_with("--")) {
+                        if word.eq_ignore_ascii_case("begin") || word.eq_ignore_ascii_case("case") { depth += 1; opened = true; }
+                        if word.eq_ignore_ascii_case("end") { depth -= 1; }
+                    }
+                }
+                closed || (dollar.is_none() && (t.eq_ignore_ascii_case("go") || opened && depth <= 0))
+            },
+            _ => false,
+        };
+        if end { return i + 1; }
+    }
+    ls.len()
+}
+
 /// Lines of the function a 1-based tagged line `n` belongs to: from the tag to the brace that closes it.
 pub fn body(ls: &[String], n: usize, cap: usize) -> &[String] {
+    // shortcut: language-specific raw strings need a lexer when exact boundaries are required.
     let (start, mut depth, mut opened) = (n - 1, 0i32, false);
+    let (mut quote, mut raw, mut triple, mut block_comment) = (None, None::<usize>, false, false);
     let stop = (start + cap).min(ls.len());
     for (k, line) in ls[start.min(stop)..stop].iter().enumerate() {
-        depth += line.matches('{').count() as i32 - line.matches('}').count() as i32;
-        opened = opened || line.contains('{');
-        if depth < 0 || (opened && depth == 0) {
-            return &ls[start..start + k + 1];
+        let mut chars = line.chars().peekable();
+        while let Some(c) = chars.next() {
+            if block_comment {
+                if c == '*' && chars.peek() == Some(&'/') { chars.next(); block_comment = false; }
+            } else if let Some(hashes) = raw {
+                if c == '"' && chars.clone().take(hashes).all(|c| c == '#') && chars.clone().take(hashes).count() == hashes {
+                    for _ in 0..hashes { chars.next(); }
+                    raw = None;
+                }
+            } else if triple {
+                if c == '"' && chars.peek() == Some(&'"') && chars.clone().nth(1) == Some('"') {
+                    chars.next(); chars.next(); triple = false;
+                }
+            } else if let Some(q) = quote {
+                if c == '\\' { chars.next(); } else if c == q { quote = None; }
+            } else if c == '/' && chars.peek() == Some(&'/') {
+                break;
+            } else if c == '/' && chars.peek() == Some(&'*') {
+                chars.next(); block_comment = true;
+            } else if c == 'r' && chars.clone().skip_while(|c| *c == '#').next() == Some('"') {
+                let hashes = chars.clone().take_while(|c| *c == '#').count();
+                for _ in 0..=hashes { chars.next(); }
+                raw = Some(hashes);
+            } else if c == '"' && chars.peek() == Some(&'"') && chars.clone().nth(1) == Some('"') {
+                chars.next(); chars.next(); triple = true;
+            } else if c == '"' || c == '`' {
+                quote = Some(c);
+            } else if c == '\'' && (chars.clone().nth(1) == Some('\'') || chars.peek() == Some(&'\\')) {
+                quote = Some(c);
+            } else if c == '{' {
+                depth += 1; opened = true;
+            } else if c == '}' {
+                depth -= 1;
+            }
+            if depth < 0 || (opened && depth == 0) { return &ls[start..start + k + 1]; }
         }
     }
     &ls[start.min(stop)..stop]

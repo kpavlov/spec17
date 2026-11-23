@@ -83,10 +83,10 @@ impl Analysis {
         let decls = self.graph.as_ref().and_then(|g| g.decls_in(file).ok()).unwrap_or_default();
         let ls = self.p.lines(file);
         let mut tests = vec![];
-        for (m, at, head, end) in self.p.test_ranges(file) {
+        for (m, at, head, end) in self.p.test_ranges(file, self.graph.as_ref()) {
             let line = &ls[m];
             // the declaration is on the marker line or just below an attribute / annotation
-            let decl = lang.decl.captures(&ls[at]).and_then(|c| c.get(1)).map(|c| c.as_str().to_string());
+            let decl = lang.decl.captures(&ls[at]).and_then(|c| c.get(1)).map(|c| c.as_str().trim_matches('`').to_string());
             let name = match (decl, call) {
                 (Some(n), false) => n,
                 _ => QUOTED.captures(line).map_or_else(|| line.trim().to_string(), |c| c[1].to_string()),

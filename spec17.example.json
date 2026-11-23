@@ -5,8 +5,15 @@
   "ext": ["swift"],
   "profiles": [{
     "name": "swift",
-    "case": "^\\s*@Test\\b|^\\s*func\\s+test",
+    "case": ["^\\s*@Test\\b", "^\\s*func\\s+(?:test\\w*|`test[^`]*`)"],
     "test": "(^|/)[^/]*Tests?(/|\\.swift$)"
+  }, {
+    "name": "typescript",
+    "case": "^\\s*(?:it|test)\\s*\\(",
+    "call": true
+  }, {
+    "name": "rust",
+    "inline": true
   }],
   "retired_prefixes": [],
   "codegraph": ".codegraph/codegraph.db"

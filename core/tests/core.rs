@@ -250,6 +250,109 @@ fn comment_tag_inside_a_test_belongs_to_that_test() {
     assert_eq!(a.tests_view().modules[0].files[0].tests[0].ids, ["DEM-01"]);
 }
 
+#[doc = "[SCAN-36]"]
+#[test]
+fn report_distinguishes_attached_and_orphan_comment_tags() {
+    let d = scratch("comment-tag-state");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["py"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
+    write(&d, "tests/test_a.py", "# [DEM\x2D01]\ndef test_a():\n    assert True\n\n# [DEM\x2D02]\n\nvalue = 1\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let r = a.report();
+    assert_eq!(r.comment_tagged.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-01"]);
+    assert_eq!(r.invalid_tests["comment-only"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-02"]);
+    assert!(r.text(&a, 12).contains("comment-tagged"));
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn non_brace_test_bodies_end_before_following_code() {
+    for (ext, first, second) in [
+        ("rb", "it 'first' do\n  # [DEM\x2D01]\nend\n", "it 'second' do\n  # [DEM\x2D02]\n  expect(true)\nend\n"),
+        ("lua", "it('first', function()\n  -- [DEM\x2D01]\nend)\n", "it('second', function()\n  -- [DEM\x2D02]\n  assert(true)\nend)\n"),
+        ("vb", "<Test>\nSub first()\n  ' [DEM\x2D01]\nEnd Sub\n", "<Test>\nSub second()\n  ' [DEM\x2D02]\n  Assert.IsTrue(True)\nEnd Sub\n"),
+        ("pas", "procedure TestFirst;\nbegin\n  // [DEM\x2D01]\nend;\n", "procedure TestSecond;\nbegin\n  // [DEM\x2D02]\n  AssertTrue(true);\nend;\n"),
+        ("erl", "first_test() ->\n  % [DEM\x2D01]\n  ok.\n", "second_test() ->\n  % [DEM\x2D02]\n  ?assert(true).\n"),
+        ("sql", "CREATE FUNCTION test_first() RETURNS void AS $$\n  -- [DEM\x2D01]\n  SELECT 1;\n$$ LANGUAGE SQL;\n", "CREATE FUNCTION test_second() RETURNS void AS $$\n  -- [DEM\x2D02]\n  SELECT ok(true);\n$$ LANGUAGE SQL;\n"),
+    ] {
+        let d = scratch(&format!("body-{ext}"));
+        write(&d, "spec17.json", &format!(r#"{{"tests":["tests"],"ext":["{ext}"]}}"#));
+        write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
+        write(&d, &format!("tests/test_example.{ext}"), &format!("{first}\n{second}"));
+        let a = Analysis::load(Some(&d)).unwrap();
+        let cases = &a.tests_view().modules[0].files[0].tests;
+        assert_eq!(cases.len(), 2, "{ext}");
+        assert_eq!(cases[0].ids, ["DEM-01"], "{ext}");
+        assert_eq!(cases[1].ids, ["DEM-02"], "{ext}");
+        assert_eq!(a.report().invalid_tests["no-assert"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-01"], "{ext}");
+    }
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn test_boundaries_ignore_literals_and_nested_blocks() {
+    for (ext, text) in [
+        ("swift", "func testFirst() {\n  // [DEM\x2D01]\n  let s = \"}\"\n  /* } */\n  XCTAssertTrue(true)\n}\n\n// [DEM\x2D02]\n\nfunc helper() {}\n"),
+        ("sql", "CREATE FUNCTION test_first() RETURNS void AS $body$\n  -- [DEM\x2D01]\n  SELECT ok(true);\n$body$ LANGUAGE SQL;\n\n-- [DEM\x2D02]\n\nSELECT 1;\n"),
+        ("sql", "CREATE PROCEDURE test_first AS\nBEGIN\n  -- [DEM\x2D01]\n  SELECT CASE WHEN 1=1 THEN 1 ELSE 0 END;\n  EXEC tSQLt.AssertEquals 1, 1;\nEND;\n\n-- [DEM\x2D02]\n\nSELECT 1;\n"),
+        ("rb", "it 'first' do\nif true\nend\n  # [DEM\x2D01]\n  expect(true)\nend\n\n# [DEM\x2D02]\n\nputs 'outside'\n"),
+        ("lua", "it('first', function()\nif true then\nend\n  -- [DEM\x2D01]\n  assert(true)\nend)\n\n-- [DEM\x2D02]\n\nprint('outside')\n"),
+        ("pas", "procedure TestFirst;\nbegin\nbegin\nend;\n  // [DEM\x2D01]\n  AssertTrue(true);\nend;\n\n// [DEM\x2D02]\n\nprocedure helper;\n"),
+    ] {
+        let d = scratch(&format!("nested-{ext}"));
+        write(&d, "spec17.json", &format!(r#"{{"tests":["tests"],"ext":["{ext}"]}}"#));
+        write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
+        write(&d, &format!("tests/test_example.{ext}"), text);
+        let a = Analysis::load(Some(&d)).unwrap();
+        let cases = &a.tests_view().modules[0].files[0].tests;
+        assert_eq!(cases[0].ids, ["DEM-01"], "{ext}");
+        let r = a.report();
+        assert!(r.invalid_tests["no-assert"].is_empty(), "{ext}");
+        assert_eq!(r.invalid_tests["comment-only"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-02"], "{ext}");
+    }
+}
+
+#[doc = "[SCAN-37]"]
+#[test]
+fn swift_backticked_test_names_are_detected() {
+    let d = scratch("swift-backticks");
+    write(&d, "spec17.json", r#"{"tests":["Tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "Tests/ExampleTests.swift", "// [DEM\x2D01]\n@objc(testWorks) func `test does work`() { XCTAssertTrue(true) }\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!(cases.len(), 1);
+    assert_eq!(cases[0].name, "test does work");
+    assert_eq!(cases[0].ids, ["DEM-01"]);
+}
+
+#[doc = "[SCAN-38]"]
+#[test]
+fn example_profile_configuration_loads() {
+    let d = scratch("example-config");
+    write(&d, "spec17.json", include_str!("../../spec17.example.json"));
+    assert!(Project::open(Some(&d)).is_ok());
+}
+
+#[doc = "[SCAN-34]"]
+#[test]
+fn profile_patterns_accept_ordered_lists_and_validate_every_entry() {
+    let d = scratch("profile-pattern-lists");
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
+    let config = r#"{"profiles":[{"name":"example","ext":["xyz"],"comment":["//"],"decl":["^fn (a)","^fn (\\w+)"],"assert":["unmatched!","check!"],"off":["NEVER_SKIP","SKIP"],"test":["^other/","^tests/"],"case":["^CASE$","^OTHER$"]}]}"#;
+    write(&d, "spec17.json", config);
+    write(&d, "src/app.xyz", "fn app() {}\n");
+    write(&d, "tests/example.xyz", "// [DEM\x2D01]\nCASE\nfn alpha() {\n check!(true)\n}\n\n@SKIP\n// [DEM\x2D02]\nOTHER\nfn beta() {\n check!(true)\n}\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!(cases.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["a", "beta"]);
+    assert_eq!(cases[0].ids, ["DEM-01"]);
+    assert_eq!(a.report().invalid_tests["disabled"][0].id, "DEM-02");
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+    write(&d, "spec17.json", &config.replace("\"check!\"", "\"(\""));
+    assert!(Analysis::load(Some(&d)).err().unwrap().contains("bad regex"));
+}
+
 #[doc = "[SCAN-34]"]
 #[test]
 fn spec17_json_adds_and_merges_profiles() {
@@ -317,6 +420,37 @@ fn index(d: &Path, with_edges_kind: bool) {
         if with_edges_kind { "insert into edges(source,target,kind) values ('t1','n2','calls'),('n2','n1','references');" } else { "" })).unwrap();
 }
 
+#[doc = "[SCAN-35]"]
+#[test]
+fn indexed_test_boundaries_are_shared_and_stale_indexes_fall_back() {
+    let d = scratch("indexed-test-boundaries");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    let test = "func testExample() {\n  let text = #\"a \" } b\"#\n  // [DEM\x2D01]\n  XCTAssertTrue(true)\n}\n";
+    write(&d, "tests/DemoTests.swift", test);
+    index(&d, true);
+    let c = Connection::open(d.join(".codegraph/codegraph.db")).unwrap();
+    c.execute_batch("delete from nodes; insert into nodes values ('t','method','testExample','testExample','tests/DemoTests.swift',1,5,null);").unwrap();
+    drop(c);
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert_eq!(a.tests_view().modules[0].files[0].tests[0].ids, ["DEM-01"]);
+    assert!(a.report().invalid_tests["comment-only"].is_empty());
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+    drop(a);
+    let file = fs::OpenOptions::new().write(true).open(d.join("tests/DemoTests.swift")).unwrap();
+    file.set_times(fs::FileTimes::new().set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(60))).unwrap();
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.tests_view().modules[0].files[0].tests[0].ids.is_empty());
+    assert_eq!(a.report().invalid_tests["comment-only"][0].id, "DEM-01");
+    drop(a);
+    file.set_times(fs::FileTimes::new().set_modified(std::time::SystemTime::now() - std::time::Duration::from_secs(60))).unwrap();
+    let c = Connection::open(d.join(".codegraph/codegraph.db")).unwrap();
+    c.execute_batch("update nodes set kind='class' where id='t'").unwrap();
+    drop(c);
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.tests_view().modules[0].files[0].tests[0].ids.is_empty());
+}
+
 #[doc = "[GRAPH-01, GRAPH-04]"]
 #[test]
 fn codegraph_links_tests_to_code() {
@@ -357,10 +491,10 @@ fn codegraph_schema_drift_is_an_error_not_a_panic() {
 #[test]
 fn every_profile_compiles() {
     for p in spec17_core::detect::PROFILES.iter() {
-        for rx in [&p.decl, &p.assert, &p.off, &p.test, &p.case] {
+        for rx in [&p.decl, &p.assert, &p.off, &p.test, &p.case].into_iter().flatten() {
             regex::Regex::new(rx).unwrap_or_else(|e| panic!("{}: {rx}: {e}", p.name));
         }
-        assert!(p.decl.contains('('), "{}: decl needs a name group", p.name);
+        assert!(p.decl.iter().all(|s| s.contains('(')), "{}: decl needs a name group", p.name);
     }
     // spec_format.toml: group 1 of a requirement line is the ID, so the patterns may not capture
     let f = &*spec17_core::scan::FORMAT;
@@ -723,6 +857,20 @@ fn consecutive_ids_print_as_a_range() {
 fn a_tests_body_stops_at_its_closing_brace() {
     let ls: Vec<String> = ["@Test(\"[A-1]\")", "func f() {", "  x()", "}", "other"].iter().map(|s| s.to_string()).collect();
     assert_eq!(spec17_core::scan::body(&ls, 1, 200).len(), 4);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn test_body_ignores_braces_in_rust_raw_strings_and_comments() {
+    let ls: Vec<String> = ["fn test_example() {", "  let x = r##\"first \" }", "  { second\"##;", "  /* }", "  { */", "  assert!(true);", "}", "after"].into_iter().map(str::to_string).collect();
+    assert_eq!(spec17_core::scan::body(&ls, 1, 200).len(), 7);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn test_body_ignores_braces_in_multiline_quoted_strings() {
+    let ls: Vec<String> = ["func testExample() {", "  let x = \"\"\"", "  a \" }", "  \"\"\"", "  XCTAssertTrue(true)", "}", "after"].into_iter().map(str::to_string).collect();
+    assert_eq!(spec17_core::scan::body(&ls, 1, 200).len(), 6);
 }
 
 #[doc = "[SCAN-18, SCAN-19]"]

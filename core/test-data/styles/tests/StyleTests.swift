@@ -1,3 +1,5 @@
+import Testing
+
 @Test("[REQ_001] underscore tag") func a() {
     #expect(true)
 }

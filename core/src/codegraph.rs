@@ -124,6 +124,12 @@ impl Graph {
         Ok(st.query_map([file], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<Result<_, _>>()?)
     }
 
+    /// (SCAN-35) Function and method ranges in one test file.
+    pub fn test_decls_in(&self, file: &str) -> R<Vec<(i64, i64)>> {
+        let mut st = self.c.prepare("select start_line, end_line from nodes where file_path=?1 and kind in ('function','method')")?;
+        Ok(st.query_map([file], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<Result<_, _>>()?)
+    }
+
     /// Every node under `prefix`, in index order.
     pub fn nodes_under(&self, prefix: &str) -> R<Vec<Node>> {
         let mut st = self.c.prepare("select id, kind, name, qualified_name, file_path, start_line, end_line, coalesce(visibility,'') from nodes where file_path like ?1")?;

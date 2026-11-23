@@ -135,7 +135,9 @@ An ending `(manual)`, `(later)` or `(deferred)` marks a bullet; `(deferred)` mea
 - A test tag is the ID in square brackets: `[ABC-12]`, or `[ABC-12, ABC-14]` for several. Put it in the test's title, name or doc attribute, for example a Swift `@Test("[REQ_001] underscore tag")`, a Rust `#[doc = "[API-02]"]` above `#[test]`, or a Python docstring. Tags are read in files in test folders or named like tests (`test_*.py`, `*_test.go`, `*.test.ts`).
 - A source citation is an ID in a line comment (`//`, `#`, `///`) of a source file. `// (ABC-12)` is the convention; the parentheses are not required, and block comments are not scanned.
 
-The report also lists tags it distrusts, under invalid tests: an ID no spec defines (`unknown`) or a struck-out one (`retired`), an ID tagged only in a comment (`comment-only`), only on a disabled test (`disabled`), or only on a test with no direct assertion (`no-assert`). A citation of an ID no spec defines is a dangling citation when a spec uses the same prefix, which catches typos and retired IDs.
+The report also lists tags it distrusts, under invalid tests: an ID no spec defines (`unknown`) or a struck-out one (`retired`), an ID tagged only in comments outside detected tests (`comment-only`), only on a disabled test (`disabled`), or only on a test with no direct assertion (`no-assert`). A citation of an ID no spec defines is a dangling citation when a spec uses the same prefix, which catches typos and retired IDs.
+
+Comments attached to a detected test are listed separately as `comment-tagged`. They are evidence to review and do not count as invalid tests.
 
 ## States
 
@@ -171,6 +173,8 @@ Most repos need none. To override a detected field, put `spec17.json` at the rep
 ```
 
 Each file is read with the profile of its language: comment markers, `decl`, `assert`, `off`, `test` (which paths are tests) and `case` (the line that opens a test case). `profiles` holds entries shaped like a `[[profile]]` of `core/resources/profiles.toml`: `{"name": "rust", "assert": "assert!|panic!"}` changes only that field of the built-in Rust profile, and a new `name` with `ext` and `comment` adds a language. A field a profile does not have is an error, and so are the old top-level `comment`, `decl`, `assert`, `off`, `case` and `test_files`.
+
+Each regex field accepts a string or an ordered array of strings, such as `"assert": ["assert!", "panic!"]`. For each input, the first matching pattern wins. Every `decl` pattern needs a capture group 1 for the name. Setting an array replaces that field's built-in patterns.
 
 The requirement-line patterns (`core/resources/spec_format.toml`) and the language profiles (`core/resources/profiles.toml`) are compiled into the binary. To support another language, add a `[[profile]]` and rebuild, or put the same entry in `profiles`.
 

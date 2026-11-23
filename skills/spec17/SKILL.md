@@ -29,6 +29,7 @@ For a project-wide SDD summary, call `report` and relay it. It prints a headline
 | check-marked done without proof | ✅-style marks with `NO-TEST` or `NO-LINK` |
 | marked later but already has tests or code | a test tag or source citation was found |
 | invalid tests | tags for an ID no spec defines (`unknown`) or a struck-out one (`retired`); an ID tagged only in comments (`comment-only`), only on disabled tests (`disabled`), or only on tests with no direct assertion (`no-assert`, may assert through a helper) |
+| comment-tagged | IDs in comments attached to detected tests; evidence to review, not a problem count or a passing result |
 | spec issues | duplicate IDs, bullets without MUST/SHOULD/MAY (unless the ID is defined elsewhere), requirement headings without an ID, misplaced markers, citations of undefined IDs, a check mark with `(later)` |
 | dangling citations | IDs cited by tests or source that no spec defines |
 | specs to compare | declarations covered by two or more requirements whose specs do not cite each other: possible conflict (needs the CodeGraph index) |
@@ -65,7 +66,11 @@ States: `tested` (a `[ID]` tag exists; run the suite to know it passes), `src-on
 
 Scanned: `specs/*.md` bullets (wrapped lines joined; struck-through bullets are retired); test tags `[ABC-12]`, `[ABC-12][ABC-14]` or `[ABC-12, ABC-14]` anywhere in the test folders. A comment tag directly above or inside a detected test belongs to that test, including when annotations intervene. Source IDs follow a line-comment marker of the file's language (block comments are not read). Folders and extensions come from `spec17.json` or detection.
 
+Test bodies use a matching CodeGraph function or method range when available and the index file is at least as new as the test file. Other tests use language-specific boundary heuristics; an index timestamp does not guarantee every entry is current. Review attribution when boundaries matter.
+
 In a profile, `case` is a regex matching a test marker, declaration or call. It replaces the built-in pattern, so include every form to retain, for example Swift's `^\\s*@Test\\b|^\\s*func\\s+(?:test\\w*|\u0060test[^\u0060]*\u0060)`. `call: true` takes the test name from the quoted string in a matched call such as `it("name", ...)`. `inline: true` includes source folders when finding tests, as for Rust's inline tests.
+
+The `decl`, `assert`, `off`, `test` and `case` fields each accept a regex string or an ordered array of regex strings. The first pattern matching an input wins; each `decl` pattern needs capture group 1 for the name. A configured array replaces that field's built-in patterns.
 
 ## trace — what a requirement touches
 
