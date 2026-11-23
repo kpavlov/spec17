@@ -5,6 +5,7 @@ edition.workspace = true
 description = "CLI, MCP server and web dashboard for spec-driven-development evidence."
 authors.workspace = true
 repository.workspace = true
+license-file.workspace = true
 homepage.workspace = true
 readme = "../README.md"
 keywords.workspace = true

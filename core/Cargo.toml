@@ -5,6 +5,7 @@ edition.workspace = true
 description = "Deterministic spec-driven-development evidence: requirement IDs vs tests and code citations. Evidence, not truth."
 authors.workspace = true
 repository.workspace = true
+license-file.workspace = true
 readme = "../README.md"
 keywords.workspace = true
 categories.workspace = true
