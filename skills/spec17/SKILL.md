@@ -2,6 +2,8 @@
 name: spec17
 description: >
   Report spec-driven-development (SDD) status deterministically with the spec17 MCP server: which requirement IDs (ABC-12 in specs/*.md) have tests tagged [ABC-12] and source citations, gaps in detected links, requirements linked to current changes, `later` requirements with links, check-marked ones missing links, code with no detected requirement, code covered by several requirements (conflicting or complementary specs), and one requirement traced to its tests and code. Use when asked to explore or report the SDD/spec status of a project, before changing behaviour (write the requirement first), after code changes (check the requirements still match and ask the user before editing them), when asked what is implemented or untested, or to find the code a requirement affects.
+license: "MIT. Copyright (c) 2026 Konstantin Pavlov, IT Staff OÜ"
+version: 0.3.0
 ---
 
 # Spec-driven with spec17
