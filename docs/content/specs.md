@@ -13,7 +13,9 @@ Well-known tokens that look like IDs are never requirements: `UTF-8`, `ISO-8601`
 
 A requirement also has a level: `MUST`, `SHOULD`, `MAY` or `SHALL`. Heading and paragraph styles accept the EARS `shall` in lower case too; bullets and table rows do not, and `should` and `may` must always be capitals.
 
-An optional standalone `P1`, `P2` or other `P` followed by digits in the requirement text is a priority hint, including `[P1]` and `(Priority: P1)`. An effort hint can be a T-shirt size such as `[M]` or `(XL)`, or a labelled estimate such as `[effort: 3 points]`, `(size: M)` or `[estimate: 2 days]`. Listings and traces expose both as separate fields, and keep them in the text. Labelled hints take precedence over unlabelled hints; otherwise the order of patterns in `spec_format.toml` decides, then the first match of that pattern. A bare size or priority can also occur in ordinary prose, so review the result. Place annotations before an ending `(manual)` or `(later)` marker.
+A priority hint is a `P` followed by digits in square brackets or parentheses, such as `[P1]` or `(P2)`, or a labelled `(Priority: P1)`. An effort hint is an upper-case T-shirt size in brackets such as `[M]` or `(XL)`, or a labelled estimate such as `[effort: 3 points]`, `(size: M)` or `[estimate: 2 days]`. A hint must follow whitespace, so `p95 latency`, `requirement(s)`, `P2P` and a code-quoted `` `[M]` `` are not hints. Listings and traces expose both as separate fields, and keep them in the text. Labelled hints take precedence over unlabelled hints; otherwise the order of patterns decides, then the first match of that pattern. Place annotations before an ending `(manual)` or `(later)` marker.
+
+The patterns are `priority` and `effort` in `core/resources/spec_format.toml`. A repo replaces them with `priority` and `effort` in `spec17.json`: ordered regexes whose capture group 1 is the value, for example `"priority": ["\\*\\*(P[0-9]+)\\*\\*"]`. A pattern without a capture group, or one that does not compile, is an error.
 
 ## Requirement styles
 
@@ -175,6 +177,10 @@ Most repos need none. To override a detected field, put `spec17.json` at the rep
 ```
 
 Each file is read with the profile of its language: comment markers, `decl`, `assert`, `off`, `test` (which paths are tests) and `case` (the line that opens a test case). `profiles` holds entries shaped like a `[[profile]]` of `core/resources/profiles.toml`: `{"name": "rust", "assert": "assert!|panic!"}` changes only that field of the built-in Rust profile, and a new `name` with `ext` and `comment` adds a language. A field a profile does not have is an error, and so are the old top-level `comment`, `decl`, `assert`, `off`, `case` and `test_files`.
+
+`annotation` is a regex for a line that attaches to the declaration below it, as a comment above does (`^\s*@` for Swift and Kotlin, `^\s*#\[` for Rust, `^\s*\[` for C#); a tag in a comment above such a line still belongs to the test. A test marker that sits inside a string literal or a trailing comment opens no case. A profile that sets no `annotation` has none.
+
+A language without braces says how a test body ends in its profile: `block_indent` (Python: the first line no deeper than the declaration); `block_open` and `block_close` (nesting, where each match on a line adds or removes a level and the body ends back at 0, as for Ruby `do`/`end` or Lua `function`/`end`); `block_end` (the first line matching it, as for Visual Basic `End Sub`); `block_fence` (a SQL `$$` or `$tag$` region in which nothing counts). Without any of them a body is closed by its braces. `block_indent` cannot be combined with the others, and `block_open` and `block_close` come as a pair; anything else is an error when the repo is opened. A body is looked for only down to the next test's header, so a miscounted body cannot slow the scan down. These are patterns, not a parser: an unusual keyword position can miscount.
 
 Each regex field accepts a string or an ordered array of strings, such as `"assert": ["assert!", "panic!"]`. For each input, the first matching pattern wins. Every `decl` pattern needs a capture group 1 for the name. Setting an array replaces that field's built-in patterns.
 

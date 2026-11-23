@@ -124,6 +124,12 @@ impl Graph {
         Ok(st.query_map([file], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<Result<_, _>>()?)
     }
 
+    /// (SCAN-35) The SHA-256 (hex) of the file as the index last read it; None when the file is not indexed.
+    pub fn indexed_hash(&self, file: &str) -> R<Option<String>> {
+        let mut st = self.c.prepare("select content_hash from files where path=?1")?;
+        Ok(st.query_map([file], |r| r.get(0))?.next().transpose()?)
+    }
+
     /// (SCAN-35) Function and method ranges in one test file.
     pub fn test_decls_in(&self, file: &str) -> R<Vec<(i64, i64)>> {
         let mut st = self.c.prepare("select start_line, end_line from nodes where file_path=?1 and kind in ('function','method')")?;

@@ -80,10 +80,11 @@ impl Analysis {
         // the profile of the file's extension, else the dominant one (`Project::lang`)
         let lang = self.p.lang(file);
         let call = lang.call;
-        let decls = self.graph.as_ref().and_then(|g| g.decls_in(file).ok()).unwrap_or_default();
+        // the index names a declaration only while it holds this content of the file (SCAN-35)
+        let decls = self.graph.as_ref().filter(|g| self.p.index_holds(g, file)).and_then(|g| g.decls_in(file).ok()).unwrap_or_default();
         let ls = self.p.lines(file);
         let mut tests = vec![];
-        for (m, at, head, end) in self.p.test_ranges(file, self.graph.as_ref()) {
+        for crate::scan::Case { marker: m, decl: at, head, end } in self.p.test_ranges(file, self.graph.as_ref()) {
             let line = &ls[m];
             // the declaration is on the marker line or just below an attribute / annotation
             let decl = lang.decl.captures(&ls[at]).and_then(|c| c.get(1)).map(|c| c.as_str().trim_matches('`').to_string());

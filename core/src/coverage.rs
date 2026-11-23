@@ -148,7 +148,7 @@ impl Analysis {
         let mut tested: HashSet<String> = HashSet::new(); // names that appear in the body of a test tagged with a requirement
         for refs in self.t.values() {
             for r in refs {
-                for line in body(&self.p.lines(&r.file), r.line, 200) {
+                for line in body(&self.p.lines(&r.file), r.line, 200, self.p.lang(&r.file)) {
                     tested.extend(WORD.find_iter(line).map(|m| m.as_str().to_string()));
                 }
             }

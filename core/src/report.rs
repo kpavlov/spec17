@@ -576,7 +576,7 @@ impl Analysis {
         let tests = self.t.get(&want).cloned().unwrap_or_default();
         let mut idents: HashSet<String> = HashSet::new();
         for r in &tests {
-            for line in crate::scan::body(&self.p.lines(&r.file), r.line, 200) {
+            for line in crate::scan::body(&self.p.lines(&r.file), r.line, 200, self.p.lang(&r.file)) {
                 idents.extend(crate::scan::WORD.find_iter(line).map(|m| m.as_str().to_string()));
             }
         }

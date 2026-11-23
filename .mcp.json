@@ -15,17 +15,6 @@
     "spec17": {
       "type": "http",
       "url": "http://127.0.0.1:7411/mcp"
-    },
-    "spec17-stdio": {
-      "type": "stdio",
-      "command": "/opt/homebrew/bin/spec17",
-      "args": [
-        "--stdio-mcp",
-        "--no-http-mcp",
-        "--no-ui",
-        "--root",
-        "/Users/maestro/code/github/kpavlov/spec17"
-      ]
     }
   }
 }

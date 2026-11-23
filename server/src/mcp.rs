@@ -18,12 +18,15 @@ const UI_MIME: &str = "text/html;profile=mcp-app";
 #[derive(Clone)]
 struct Mcp(AppState);
 
-// (API-25)
+// (API-25) The skill is embedded, so its entry is parsed and hashed once.
 fn skill_entry() -> Result<Skill, ErrorData> {
-    let frontmatter = skill::SKILL.strip_prefix("---\n").and_then(|s| s.find("\n---\n").map(|end| &s[..=end]))
-        .ok_or_else(|| ErrorData::internal_error("invalid skill frontmatter", None))?;
-    let frontmatter = yaml_serde::from_str(frontmatter).map_err(|e| ErrorData::internal_error(format!("invalid skill frontmatter: {e}"), None))?;
-    Ok(Skill::new(SKILL_URI, frontmatter, SkillResources::Files(vec![SkillResource::from_bytes(SKILL_URI, skill::SKILL.as_bytes())])))
+    static ENTRY: std::sync::LazyLock<Result<Skill, String>> = std::sync::LazyLock::new(|| {
+        let frontmatter = skill::SKILL.strip_prefix("---\n").and_then(|s| s.find("\n---\n").map(|end| &s[..=end]))
+            .ok_or("invalid skill frontmatter")?;
+        let frontmatter = yaml_serde::from_str(frontmatter).map_err(|e| format!("invalid skill frontmatter: {e}"))?;
+        Ok(Skill::new(SKILL_URI, frontmatter, SkillResources::Files(vec![SkillResource::from_bytes(SKILL_URI, skill::SKILL.as_bytes())])))
+    });
+    ENTRY.clone().map_err(|e| ErrorData::internal_error(e, None))
 }
 
 impl ServerHandler for Mcp {

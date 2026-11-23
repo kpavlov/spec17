@@ -49,13 +49,33 @@ pub struct Profile {
     /// `case` matches a call such as `it("name", ...)` (the name is its quoted string) rather than a marker above a declaration.
     #[serde(default)]
     pub call: bool,
+    /// A `'` may open a lifetime (Rust `'a`), so only `'x'` and `'\n'` are char literals; otherwise `'...'` is a string.
+    #[serde(default)]
+    pub lifetimes: bool,
+    /// A line that attaches to the declaration below it (`@Test`, `#[test]`, `[Fact]`, `<Test>`), like the comments above a test.
+    #[serde(default, deserialize_with = "patterns")]
+    pub annotation: Vec<String>,
+    /// How a test body ends when the language has no braces. `block_indent`: at the first line no deeper than the declaration.
+    /// `block_open` / `block_close`: nesting, where each match on a line (strings and comments left out) adds or removes a level and
+    /// the body ends when the level is back to 0. `block_end`: the first line matching ends it. `block_fence`: a match opens a quoted
+    /// region (SQL `$tag$`) in which nothing counts; the same text closes it and ends the body. None set: braces.
+    #[serde(default)]
+    pub block_indent: bool,
+    #[serde(default, deserialize_with = "patterns")]
+    pub block_open: Vec<String>,
+    #[serde(default, deserialize_with = "patterns")]
+    pub block_close: Vec<String>,
+    #[serde(default, deserialize_with = "patterns")]
+    pub block_end: Vec<String>,
+    #[serde(default, deserialize_with = "patterns")]
+    pub block_fence: Vec<String>,
 }
 
 impl Profile {
     /// An ecosystem spec17 knows nothing about: no files, no comments, regexes that match nothing.
     pub fn unknown(name: &str) -> Profile {
         let n = || vec![NEVER.to_string()];
-        Profile { name: name.into(), ext: vec![], comment: vec![], decl: n(), assert: n(), off: n(), test: n(), inline: false, case: n(), call: false }
+        Profile { name: name.into(), ext: vec![], comment: vec![], decl: n(), assert: n(), off: n(), test: n(), inline: false, case: n(), call: false, lifetimes: false, annotation: vec![], block_indent: false, block_open: vec![], block_close: vec![], block_end: vec![], block_fence: vec![] }
     }
 }
 

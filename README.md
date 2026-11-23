@@ -148,12 +148,23 @@ python3 bench/bench.py --help
 - The first revision listed is the baseline. The table has median, min and stdev in ms, the change of the median against the baseline, and a hash of each command's output; the run says whether the output is the same for every revision. A speed-up must not change the output.
 - Stdlib Python only.
 
-Results at `0eb1fbd` (0.1.0), scale 4 (8,000 requirements, 1,600 source files, 400 test files, 400 docs), 10 runs, wall time per command in ms; one macOS machine, so the absolute times only mean something on that machine:
+Results of `make bench REVS="v0.1.0 v0.2.0 ." SCALE=4 RUNS=10`: scale 4 (8,000 requirements, 1,600 source files, 400 test files, 400 docs), wall time per command in ms, one macOS machine, so the absolute times only mean something on that machine. `v0.1.0` is `71acbf4`, `v0.2.0` is `c6f045a`, and `.` is the unreleased work: `8500924` plus uncommitted changes.
 
-| command | median | min | stdev |
-|---|--:|--:|--:|
-| `report` | 116.7 | 116.1 | 1.8 |
-| `status --all` | 142.3 | 140.8 | 1.0 |
-| `trace GEN-0001` | 122.0 | 121.6 | 0.5 |
+| command | rev | median | min | stdev | vs v0.1.0 |
+|---|---|--:|--:|--:|--:|
+| `report` | v0.1.0 | 111.9 | 111.2 | 0.6 | +0.0% |
+| `report` | v0.2.0 | 112.4 | 111.3 | 1.0 | +0.4% |
+| `report` | `.` | 121.3 | 118.9 | 3.0 | +8.4% |
+| `status --all` | v0.1.0 | 138.5 | 135.9 | 1.9 | +0.0% |
+| `status --all` | v0.2.0 | 140.8 | 138.2 | 4.0 | +1.7% |
+| `status --all` | `.` | 148.1 | 145.5 | 2.4 | +6.9% |
+| `trace GEN-0001` | v0.1.0 | 120.3 | 118.7 | 1.5 | +0.0% |
+| `trace GEN-0001` | v0.2.0 | 120.7 | 116.5 | 5.7 | +0.3% |
+| `trace GEN-0001` | `.` | 123.1 | 121.7 | 1.7 | +2.3% |
+
+- The output of `status --all` and `trace` is the same in all three. The `report` output of `.` differs from the releases by a `[comment-tagged]` section (tags in comments attached to a test), so its time is not a like-for-like comparison.
+- Most of the `report` change comes from test-tag scanning and from the priority and effort hints. Bisecting the commits between the releases (a separate run, so rough) put about 7 points on two test-tag scanning commits and about 2 on the hints; the reference graph added under 1.
+- Runs differ by a few percent from one session to the next on the same machine (the stdev column shows the spread within one), so read differences under about 3% as noise.
+- The generated repo does not cover a test whose nesting never balances (a Ruby `unless` without its `end`). Measured separately on a generated Ruby file of 800 tests: searching each body to the end of the file took 130 ms; searching only down to the next test's header takes 15 ms, the same as 800 balanced tests.
 
 The 1-second change poll behind `resources/updated` is not covered: the CLI does not expose it.
