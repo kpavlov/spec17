@@ -693,9 +693,7 @@
 {/snippet}
 
 {#snippet testPanel()}
-  {#if !route.path}
-    <p class="muted empty">Select a test to preview it.</p>
-  {:else}
+  {#if route.path}
     {@const c = allCases.find((x) => x.file === route.path && x.t.line === route.line)}
     {@const lo = Math.max(1, (route.line ?? 1) - TEST_BEFORE)}
     <PaneHead title={c?.t.name ?? route.path} close={u({ ...route, path: undefined, line: undefined })} />
@@ -1127,7 +1125,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
       {#if testRequirement}
         <a href={u({ ...route, requirementId: undefined })} aria-label="Clear requirement filter {testRequirement}">{testRequirement} ×</a>
       {/if}
-      <SplitToggle />
+      {#if route.path}<SplitToggle />{/if}
     </div>
     <div class="req-options" id="test-filter-options" hidden={!reqFiltersOpen}>
       <Seg label="Tagged" options={testOpts} value={stateFilter} onpick={(k) => filter({ state: k })} />
@@ -1140,7 +1138,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
     {#if tests === null}<p class="muted">Loading…</p>
     {:else}
       <p class="muted found">{tests.total} tests detected in {tests.modules.length} modules, {taggedN} tagged with a requirement. {tests.note}</p>
-      <Split>
+      <Split showPreview={!!route.path}>
         {#snippet list()}
           <DataTable rows={testRows} columns={testCols} rowKey={(c) => c.key} selected={selTest} onselect={(k, how) => { const c = testRows.find((x) => x.key === k); navigate({ ...route, path: c?.file, line: c?.t.line }, how === "key"); }} value={testVal} groupOf={(c) => c.module} storageKey="spec17.collapsed.tests">
             {#snippet cell(c, k)}
