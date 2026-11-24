@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.3.0 — Unreleased
+## 0.3.0
 
 - Detect priority and effort hints in requirements, show them as pills and filter by them.
 - Add a graph of references between requirements, with circular references highlighted.
