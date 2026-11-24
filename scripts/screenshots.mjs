@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 // Retakes the docs screenshots in docs/static/img from a deliberately broken copy of this repo's working tree:
-//   1. breaks specs/02-server.md, server/src/main.rs and server/src/ops.rs (every problem the dashboard reports, plus
+//   1. breaks specs/02-server.md, server/src/main.rs, server/src/ops.rs and core/src/report.rs (dashboard problems, plus
 //      an edited and an added requirement for the Changes view),
 //   2. serves the release binary on a free port and drives headless Chrome over CDP (no npm dependencies),
-//   3. compresses the PNGs (oxipng from ImageOptim.app or PATH), restores the three files with `git checkout`, also on error or Ctrl-C.
+//   3. compresses the PNGs (oxipng from ImageOptim.app or PATH), restores those files, also on error or Ctrl-C.
 // Usage: node scripts/screenshots.mjs [--no-build]   (make screenshots)   CHROME=/path/to/chrome overrides the browser.
-// Needs Node >= 22 (global WebSocket), Chrome or Chromium, pnpm and cargo (unless --no-build, with web/dist and the binary built).
+// Needs Node >= 22, Chrome or Chromium, a current CodeGraph index, pnpm and cargo (unless --no-build).
 import { execFileSync, spawn } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { createServer } from "node:net";
@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const img = join(root, "docs/static/img");
 const bin = join(root, "target/release/spec17");
-const FILES = ["specs/02-server.md", "server/src/main.rs", "server/src/ops.rs"];
+const FILES = ["specs/02-server.md", "server/src/main.rs", "server/src/ops.rs", "core/src/report.rs"];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const run = (cmd, args, cwd = root) => execFileSync(cmd, args, { cwd, stdio: "inherit" });
 
@@ -38,9 +38,12 @@ function breakThings() {
   // a test tagged with an unknown ID (API-07 loses its test), a source citing an unknown ID
   edit("server/src/main.rs", '#[doc = "[API-07]"]', '#[doc = "[API-97]"]');
   edit("server/src/ops.rs", "// (API-03)\n", "// (API-03) (API-77)\n");
+  // Cross-spec citations in one declaration create an overlap; the index already has uncovered declarations.
+  edit("core/src/report.rs", "// (SCAN-36) Comment tags", "// (SCAN-36, API-02) Comment tags");
 }
 
-const restore = () => execFileSync("git", ["checkout", "--", ...FILES], { cwd: root });
+const originals = new Map();
+const restore = () => { for (const [file, content] of originals) writeFileSync(join(root, file), content); };
 
 const freePort = () =>
   new Promise((res, rej) => {
@@ -80,7 +83,12 @@ async function openBrowser(dir) {
     pending.delete(m.id);
     m.error ? p.rej(new Error(m.error.message)) : p.res(m.result);
   };
-  const send = (method, params = {}) => new Promise((res, rej) => (pending.set(++n, { res, rej }), ws.send(JSON.stringify({ id: n, method, params }))));
+  const send = (method, params = {}) => new Promise((res, rej) => {
+    const id = ++n;
+    const timer = setTimeout(() => { pending.delete(id); rej(new Error(`Chrome timed out: ${method}`)); }, 30000);
+    pending.set(id, { res: (value) => (clearTimeout(timer), res(value)), rej: (error) => (clearTimeout(timer), rej(error)) });
+    ws.send(JSON.stringify({ id, method, params }));
+  });
   const evaluate = async (expression) => (await send("Runtime.evaluate", { expression, returnByValue: true, awaitPromise: true })).result.value;
   return { proc, send, evaluate, close: () => (ws.close(), proc.kill()) };
 }
@@ -106,6 +114,10 @@ const SHOTS = [
     { url: "/", theme, file: `dashboard-${theme}.png`, full: true },
     { url: "/changes", theme, file: `changes-${theme}.png` },
     { url: "/requirements/API-02", theme, file: `requirements-${theme}.png` },
+    { url: "/requirements?view=graph", theme, file: `requirements-graph-${theme}.png` },
+    { url: "/tests", theme, file: `tests-${theme}.png` },
+    { url: "/overlap", theme, file: `overlap-${theme}.png` },
+    { url: "/uncovered", theme, file: `uncovered-${theme}.png` },
     { url: "/settings", theme, file: `settings-${theme}.png`, full: true },
   ]),
 ];
@@ -126,7 +138,7 @@ function optimize(files) {
 
 async function main() {
   if (execFileSync("git", ["status", "--porcelain", "--", ...FILES], { cwd: root, encoding: "utf8" }).trim()) {
-    throw new Error(`refusing to run: ${FILES.join(", ")} have uncommitted changes that the restore would discard`);
+    throw new Error(`refusing to run: ${FILES.join(", ")} have uncommitted changes`);
   }
   if (!process.argv.includes("--no-build")) {
     run("pnpm", ["run", "build"], join(root, "web"));
@@ -138,11 +150,15 @@ async function main() {
     browser?.close();
     server?.kill();
     restore();
-    rmSync(dir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   };
   process.on("SIGINT", () => (cleanup(), process.exit(130)));
   try {
+    for (const file of FILES) originals.set(file, readFileSync(join(root, file)));
     breakThings();
+    const overlap = JSON.parse(execFileSync(bin, ["overlap", "--json"], { cwd: root, encoding: "utf8" }));
+    const uncovered = JSON.parse(execFileSync(bin, ["uncovered", "--json"], { cwd: root, encoding: "utf8" }));
+    if (!overlap.length || !uncovered.units) throw new Error("screenshot data needs overlap and uncovered results; refresh the CodeGraph index");
     const port = await freePort();
     server = spawn(bin, ["--root", root, "serve", "--port", String(port), "--no-open"], { stdio: "ignore" });
     const base = `http://127.0.0.1:${port}`;
@@ -151,8 +167,12 @@ async function main() {
       if (i > 100) throw new Error("the server did not start");
       await sleep(100);
     }
-    browser = await openBrowser(join(dir, "profile"));
-    for (const s of SHOTS) await shoot(browser, base, s);
+    for (const [i, s] of SHOTS.entries()) {
+      browser = await openBrowser(join(dir, `profile-${i}`));
+      await shoot(browser, base, s);
+      browser.close();
+      browser = undefined;
+    }
     optimize(SHOTS.map((s) => join(img, s.file)));
   } finally {
     cleanup();

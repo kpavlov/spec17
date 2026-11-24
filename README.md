@@ -9,6 +9,12 @@ Deterministic spec-driven-development evidence for a repo: which requirement IDs
 > **Evidence, not truth.** A citation or test tag does not prove a requirement is implemented or that its test passes. Output is a candidate list for a human or an assessor to judge.
 
 One Rust binary gives three interfaces over the same core: a CLI, an MCP server (streamable HTTP or stdio) and a web dashboard.
+The MCP server also exposes the dashboard as an MCP App in compatible clients.
+
+- Scan several requirement formats and detect test tags, code citations, priority and effort hints.
+- Filter requirements and tests, explore references between requirements (including cycles), and inspect changes and related evidence.
+- Use the bundled agent skill over MCP or install it locally. Its review guidance separates code evidence, test assertions and tests actually run.
+- Optionally use a CodeGraph index to explore related code, potential overlap and uncovered declarations.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/static/img/dashboard-dark.png">
@@ -80,7 +86,7 @@ SKIP_WEB_BUILD=1 cargo install --path server --locked   # or: cargo build --rele
 core/     spec17-core: scan, config, report, coverage, codegraph (the only SQL)
 server/   spec17 binary: CLI, axum API, MCP (rmcp), UI serving
 web/      Svelte 5 + Vite (no SvelteKit), builds to one dist/index.html
-skills/   the agent skill (SKILL.md), embedded in the binary
+skills/   the agent skill (SKILL.md + references/), embedded in the binary
 docs/     Hugo site for spec17.dev (make docs); .github/workflows/pages.yml publishes it to GitHub Pages
 bench/    bench.py: before/after timings (make bench)
 ```

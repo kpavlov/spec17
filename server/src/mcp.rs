@@ -18,13 +18,18 @@ const UI_MIME: &str = "text/html;profile=mcp-app";
 #[derive(Clone)]
 struct Mcp(AppState);
 
+fn skill_uri(path: &str) -> String {
+    format!("skill://spec17/{path}")
+}
+
 // (API-25) The skill is embedded, so its entry is parsed and hashed once.
 fn skill_entry() -> Result<Skill, ErrorData> {
     static ENTRY: std::sync::LazyLock<Result<Skill, String>> = std::sync::LazyLock::new(|| {
         let frontmatter = skill::SKILL.strip_prefix("---\n").and_then(|s| s.find("\n---\n").map(|end| &s[..=end]))
             .ok_or("invalid skill frontmatter")?;
         let frontmatter = yaml_serde::from_str(frontmatter).map_err(|e| format!("invalid skill frontmatter: {e}"))?;
-        Ok(Skill::new(SKILL_URI, frontmatter, SkillResources::Files(vec![SkillResource::from_bytes(SKILL_URI, skill::SKILL.as_bytes())])))
+        let files = skill::FILES.iter().map(|(path, text)| SkillResource::from_bytes(skill_uri(path), text.as_bytes())).collect();
+        Ok(Skill::new(SKILL_URI, frontmatter, SkillResources::Files(files)))
     });
     ENTRY.clone().map_err(|e| ErrorData::internal_error(e, None))
 }
@@ -120,8 +125,8 @@ impl ServerHandler for Mcp {
     }
 
     async fn read_resource(&self, request: ReadResourceRequestParams, _: RequestContext<RoleServer>) -> Result<ReadResourceResponse, ErrorData> {
-        if request.uri == SKILL_URI {
-            return Ok(ReadResourceResult::new(vec![ResourceContents::text(skill::SKILL, SKILL_URI).with_mime_type("text/markdown")]).into());
+        if let Some((_, text)) = skill::FILES.iter().find(|(path, _)| skill_uri(path) == request.uri) {
+            return Ok(ReadResourceResult::new(vec![ResourceContents::text(*text, request.uri.as_str()).with_mime_type("text/markdown")]).into());
         }
         if request.uri.starts_with("skill://") {
             return Err(ErrorData::invalid_params("unknown skill resource", None));

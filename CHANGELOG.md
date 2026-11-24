@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Skill: Keep agent reviews read-only and report separately what the code implements, what the tests assert, and which tests ran.
+- Skill: Require a concrete example of incompatible behavior before the agent classifies two requirements as conflicting.
+- Skill: Explain how to investigate unknown requirement IDs, missing tests, and unavailable CodeGraph results.
+
 ## 0.3.0
 
 - Detect priority and effort hints in requirements, show them as pills and filter by them.
