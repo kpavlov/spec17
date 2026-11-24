@@ -3,25 +3,27 @@ title: spec17
 description: Find tagged tests and code references for project requirements.
 ---
 
-spec17 scans a project's requirements, tests, and source code. It shows which requirements have tagged tests or references in code, flags problems in the specifications, and can flag possible overlap between requirements. A tag or reference shows where a requirement is mentioned. spec17 does not run tests or verify that a requirement is met.
+spec17 links requirements in Markdown to test tags and source comments. Use it to find requirements with missing evidence, spot stale references, and see which requirements a Git change touches. spec17 shows the links it finds without running the tests.
 
 ## Get started
 
-If you have [Homebrew](https://brew.sh/) on an Apple Silicon Mac or on Linux (arm64 or x86_64), run these commands in Terminal:
+Install with [Homebrew](https://brew.sh/) on an Apple Silicon Mac or on Linux (arm64 or x86_64).
 
 ```sh
 brew tap kpavlov/spec17 https://github.com/kpavlov/spec17
 brew install kpavlov/spec17/spec17
 ```
 
-Follow the [Quickstart](quickstart/) to scan a project, open the dashboard, or try a sample project. It also covers building from source.
+Scan your first project, try the sample, or build from source in the [quickstart](quickstart/).
 
 ## How it works
 
-![You can use spec17 directly from the dashboard or terminal, or ask an AI agent that connects through MCP. spec17 reads the project files and can also read an optional CodeGraph index.](img/overview.svg)
+Use spec17 from the CLI, the dashboard, or an assistant connected through MCP. An optional [CodeGraph index](usage/#codegraph) adds links from tests to the code they call.
 
-The [CodeGraph index](usage/#codegraph) helps spec17 find related code. You can scan requirements and find tagged tests without it.
+![The CLI, dashboard, and MCP server share a scan of the project files and optional CodeGraph index](img/overview.svg)
 
-![spec17 dashboard with test coverage, changes and the problems found](img/dashboard.png)
+![spec17 dashboard showing tagged test coverage and problems found during the scan](img/dashboard.png)
 
-See [Usage](usage/) for commands and dashboard options, [Specs and tests](specs/) for supported formats, and [Agents](agents/) to connect an AI coding assistant.
+- [CLI and dashboard reference](usage/)
+- [Requirement formats and test tags](specs/)
+- [MCP setup for coding assistants](agents/)

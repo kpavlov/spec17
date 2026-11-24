@@ -15,6 +15,7 @@
   <script src="{{ "search.js" | relURL }}" defer></script>
   <script src="{{ "toc.js" | relURL }}" defer></script>
   <script src="{{ "copy.js" | relURL }}" defer></script>
+  <script src="{{ "screenshots.js" | relURL }}" defer></script>
 </head>
 <body>
   <header>
@@ -62,6 +63,16 @@
         {{ if lt (add $i 1) (len $all) }}{{ with index $all (add $i 1) }}<a rel="next" href="{{ .RelPermalink }}">{{ .LinkTitle }} →</a>{{ end }}{{ end }}
       </div>
     </main>
+    {{/* (NFR-17) */}}
+    <footer>
+      <div>Tags and citations show where requirements are referenced. spec17 does not run tests.</div>
+      <div>Copyright &copy; 2026 Konstantin Pavlov, <a href="https://itstaff.ee/">IT Staff OÜ</a>. All rights reserved.</div>
+      <div><a class="contact" href="mailto:info@itstaff.ee">Contact</a> · <a href="https://github.com/kpavlov/spec17/issues">Feedback</a></div>
+    </footer>
   </div>
+  <dialog id="screenshot-viewer" aria-label="Screenshot viewer" aria-describedby="screenshot-viewer-help">
+    <div class="screenshot-scroll" tabindex="0" autofocus role="region" aria-label="Screenshot"></div>
+    <p id="screenshot-viewer-help"><kbd>+</kbd> and <kbd>−</kbd> to zoom. Drag to pan. Click or press <kbd>Esc</kbd> to close.</p>
+  </dialog>
 </body>
 </html>

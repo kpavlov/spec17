@@ -1,10 +1,13 @@
-{{- /* ![alt](img/name.png): when static/img/name-light.png and name-dark.png both exist, emit both and let style.css show the one for the theme; else the file as written. */ -}}
+{{- /* (NFR-18) The link is a fallback when the screenshot viewer is unavailable. */ -}}
 {{- $dest := .Destination -}}
 {{- $ext := path.Ext $dest -}}
 {{- $stem := strings.TrimSuffix $ext $dest -}}
 {{- $local := replaceRE `^(\.\./|\./)+` "" $stem -}}
 {{- if and (fileExists (printf "static/%s-light%s" $local $ext)) (fileExists (printf "static/%s-dark%s" $local $ext)) -}}
-<img class="light-only" src="{{ $stem }}-light{{ $ext }}" alt="{{ .PlainText }}"{{ with .Title }} title="{{ . }}"{{ end }}><img class="dark-only" src="{{ $stem }}-dark{{ $ext }}" alt="{{ .PlainText }}"{{ with .Title }} title="{{ . }}"{{ end }}>
+{{- range slice "light" "dark" -}}
+{{- $src := printf "%s-%s%s" $stem . $ext -}}
+<a class="screenshot {{ . }}-only" href="{{ $src }}" aria-label="View screenshot: {{ $.PlainText }}"><img src="{{ $src }}" alt="{{ $.PlainText }}"{{ with $.Title }} title="{{ . }}"{{ end }}></a>
+{{- end -}}
 {{- else -}}
 <img src="{{ $dest }}" alt="{{ .PlainText }}"{{ with .Title }} title="{{ . }}"{{ end }}>
 {{- end -}}

@@ -3,27 +3,32 @@ title: Specs and tests
 weight: 20
 ---
 
-spec17 recognises requirement IDs in markdown, test tags in test code, and citations in source comments, then reports where they meet.
+Use the same ID in a Markdown requirement, its test tags, and its source comments. spec17 uses the ID to link them in the report and dashboard.
 
 ## Requirement IDs
 
-An ID is a prefix of 2 to 10 capital letters or digits (the first is a letter), a `-` and 1 to 5 digits, with optional dotted parts: `ABC-12`, `REQ-0001`, `FR-001`, `AC-1.2`. An underscore works too, dotted parts included: `REQ_001`, `REQ_001.2`. A non-breaking hyphen (U+2011) reads as `-`.
+Use an ID such as `ABC-12`, `REQ_001`, or `AC-1.2`. Start with a prefix of 2 to 10 uppercase letters or digits, beginning with a letter. Follow it with a hyphen or underscore and 1 to 5 digits, with optional dotted number parts. spec17 treats a nonbreaking hyphen (U+2011) as `-`.
 
-Well-known tokens that look like IDs are never requirements: `UTF-8`, `ISO-8601`, `TLS-1.3`, `SHA-256`, `RFC-2119`, `CVE-2024` and similar. Only these shapes are skipped (the list is `not_id` in `core/resources/spec_format.toml`), so `HTTP-01` and `RFC-1` are still IDs.
+spec17 excludes common tokens that resemble IDs, such as `UTF-8`, `ISO-8601`, and `RFC-2119`. It accepts IDs such as `HTTP-01` and `RFC-1`.
 
-A requirement also has a level: `MUST`, `SHOULD`, `MAY` or `SHALL`. Heading and paragraph styles accept the EARS `shall` in lower case too; bullets and table rows do not, and `should` and `may` must always be capitals.
+Use `MUST`, `SHOULD`, `MAY`, or `SHALL` as the requirement level. Headings and paragraphs also accept lowercase `shall`.
 
-A priority hint is a `P` followed by digits in square brackets or parentheses, such as `[P1]` or `(P2)`, or a labelled `(Priority: P1)`. An effort hint is an upper-case T-shirt size in brackets such as `[M]` or `(XL)`, or a labelled estimate such as `[effort: 3 points]`, `(size: M)` or `[estimate: 2 days]`. A hint must follow whitespace, so `p95 latency`, `requirement(s)`, `P2P` and a code-quoted `` `[M]` `` are not hints. Listings and traces expose both as separate fields, and keep them in the text. Labelled hints take precedence over unlabelled hints; otherwise the order of patterns decides, then the first match of that pattern. Place annotations before an ending `(manual)` or `(later)` marker.
+## Priority and effort
 
-The patterns are `priority` and `effort` in `core/resources/spec_format.toml`. A repo replaces them with `priority` and `effort` in `spec17.json`: ordered regexes whose capture group 1 is the value, for example `"priority": ["\\*\\*(P[0-9]+)\\*\\*"]`. A pattern without a capture group, or one that does not compile, is an error.
+- **Priority** accepts a `P` followed by digits, as in `[P1]`, `(P2)`, or `(Priority: P1)`.
+- **Effort** accepts an uppercase T-shirt size such as `[M]` or `(XL)`, or a labeled estimate such as `[effort: 3 points]`, `(size: M)`, or `[estimate: 2 days]`.
+
+Put whitespace before each hint and place hints before any ending mark such as `(manual)`. Hints inside inline code are ignored. spec17 keeps hints in the requirement text and also reports them as separate fields. With the default patterns, labeled hints take precedence over unlabeled hints.
+
+To use a different format, set `priority` or `effort` in `spec17.json` to an ordered list of regular expressions. Each expression must capture the value in group 1. spec17 uses the first matching pattern and its first match in the text.
 
 ## Requirement styles
 
-spec17 reads several ways of writing a requirement, and one repo can mix them. The styles below are small fixtures in `core/test-data` that the tests load: bullets, tables, Spec Kit, headings and paragraphs are files of the `styles` repo; OpenSpec, Kiro, Superpowers and the fallback each have a repo of their own. Spec folders are detected, so there is nothing to configure.
+You can mix these formats in the same project. spec17 detects spec folders automatically.
 
 ### Bullets
 
-An ID, usually bold, and a level on the first line. A bullet may be `-`, `*` or `+`, or a numbered item. The ID can be bold, in backticks or plain, with an optional `:`. The requirement runs on to the next blank line.
+Start a bullet or numbered item with the ID and put the level on the same line. The ID can be bold, in backticks, or plain, with an optional colon. A blank line ends the requirement.
 
 ```md
 - **STY-01** MUST — classic bold bullet.
@@ -35,7 +40,7 @@ An ID, usually bold, and a level on the first line. A bullet may be `-`, `*` or 
 
 ### Tables
 
-A table row whose first cell is an ID, with the level in the row. Header rows hold no ID and are ignored.
+Put the ID in the first cell and the level anywhere in the row.
 
 ```md
 | ID | Level | Text |
@@ -45,7 +50,7 @@ A table row whose first cell is an ID, with the level in the row. Header rows ho
 
 ### GitHub Spec Kit
 
-Functional requirements are plain bullets. A `[NEEDS CLARIFICATION: …]` stays in the requirement text.
+Use the standard bullet format for functional and nonfunctional requirements. spec17 retains `[NEEDS CLARIFICATION: …]` in the requirement text.
 
 ```md
 - **FR-001**: System MUST allow users to sign in.
@@ -55,7 +60,7 @@ Functional requirements are plain bullets. A `[NEEDS CLARIFICATION: …]` stays 
 
 ### Headings
 
-A heading that starts with an ID opens a requirement that runs to the next heading. The level can be on any line of the block, so EARS sentences work. Lines such as `**Covers:**` and a cross-reference table of IDs without levels are not read as requirements.
+Start a heading with the ID. The requirement can use a level anywhere in the block and ends at the next heading. Lines such as `**Covers:**` can reference other requirements without defining them.
 
 ```md
 ### HDG-1: Input directory from a property
@@ -70,7 +75,7 @@ When the application starts with `importer.input-dir` set, the importer shall us
 
 ### Paragraphs
 
-A paragraph that opens with a bold ID is a block requirement too, with the level anywhere in it. Dotted IDs sort by number: `PAR-1.2` comes before `PAR-1.10`.
+Start the paragraph with a bold ID and put the level anywhere in the block. Dotted IDs sort numerically, so `PAR-1.2` comes before `PAR-1.10`.
 
 ```md
 **PAR-1.1** Happy path
@@ -92,98 +97,130 @@ The system SHALL serve an HTML page at `GET /`.
 - **THEN** the response status is `200 OK`
 ```
 
-A change in progress, `openspec/changes/<name>/specs/…`, sorts its requirements under `## ADDED`, `## MODIFIED`, `## REMOVED` and `## RENAMED` headings. The change's version of an ID replaces the base one, and a requirement under `## REMOVED Requirements` is retired. `openspec/changes/archive/` and files such as `tasks.md` are not specs. A `### Requirement: Title` with no ID is reported as a spec issue and not counted: give it an ID.
+In `openspec/changes/<name>/specs/`, spec17 uses the change's version of an ID in place of the base version. It retires IDs under `## REMOVED Requirements` and skips archived changes and task lists. A requirement heading without an ID appears as a spec issue. Add an ID to include it in the scan.
 
 ### Kiro and other unnumbered specs
 
-Kiro's `requirements.md` (`### Requirement 1`, user stories, numbered acceptance criteria) carries no IDs, so spec17 finds no requirements in it and reports the heading as a spec issue. Add IDs in any style above to have it counted.
+Headings such as Kiro's `### Requirement 1` appear as spec issues because they have no requirement ID. Add an ID using one of the formats above.
 
 ### Superpowers
 
-Design docs in `docs/superpowers/specs/` are scanned like any specs folder; plans in `docs/superpowers/plans/` are not.
+Put requirements in `docs/superpowers/specs/`. spec17 skips `docs/superpowers/plans/`.
 
 ### No specs folder
 
-When no specs folder holds a requirement line, any markdown file that has one is used. In the `fallback` fixture that is a design note:
+If spec17 finds no requirement lines in its usual spec locations, it looks for them in other Markdown files. A requirement in a design note can use the same heading format.
 
 ```md
 ### FBK-1: Startup
 The service shall start in under a second.
 ```
 
-A repo with no requirement lines at all still opens, with zero requirements.
+If the report shows zero requirements, use `spec17 doctor` to see where spec17 looked.
 
 ### Reference documents
 
-A link such as `[ADR-0003](decisions/0003-x.md)` to a decision record makes that record a reference document. It is listed with state `ref` and is never due.
+A link such as `[ADR-0003](decisions/0003-x.md)` identifies a reference document. It appears as `ref` and is excluded from due requirements.
 
 ### Lines that are not requirements
 
 | Line | Why it is skipped |
 | --- | --- |
-| `- **UTF-8** encoding is used everywhere.` | `UTF-8` is a well-known token, not an ID |
-| `- ISO-8601 MUST — a date format` | same; the level does not make it a requirement |
-| `- **B-1** The system reads the input directory.` | `B-1` has one letter, so it is not an ID |
-| `\| A1 \| single file? \| All files \|` | no ID |
-| `Prose mentions STY-01 and HDG-1 but defines nothing.` | not a bullet, row, heading or paragraph that opens with an ID |
-| `- **STY-01** is referenced here without a level.` | no level, so it does not define `STY-01` again; with no definition elsewhere it is a spec issue |
-
-UTF-8 files are read with or without a BOM, and non-ASCII text is kept as written.
+| `- ISO-8601 MUST — a date format` | spec17 excludes common tokens such as `ISO-8601`. |
+| `- **B-1** MUST read the input directory.` | The prefix needs at least two characters. |
+| `See STY-01 for details.` | The line refers to an ID without opening a requirement. |
+| `- **STY-01** is referenced here without a level.` | The bullet lacks a level. If the ID has no definition elsewhere, spec17 reports a spec issue. |
 
 ## Marks
 
-An ending `(manual)`, `(later)` or `(deferred)` marks a bullet; `(deferred)` means the same as `(later)`. A mark before the end of the line does not count, and the requirement stays due. A struck-out bullet, `- ~~**ABC-12**`, is retired. A check mark (`✅`, `✔`, `☑` or `✳`) says the author considers it done; spec17 then reports whether the tree holds evidence for that (see the verdicts below).
+- End a bullet with `(manual)` to mark it for manual verification, or `(later)` or `(deferred)` to defer it.
+- Strike through a bullet, as in `- ~~**ABC-12** MUST …~~`, to retire the ID.
+- Add a check mark (`✅`, `✔`, `☑`, or `✳`) to mark a requirement done. spec17 reports what evidence it found for that mark. See [States](#states).
 
 ## Tests and citations
 
-- A test tag is the ID in square brackets: `[ABC-12]`, or `[ABC-12, ABC-14]` for several. Put it in the test's title, name or doc attribute, for example a Swift `@Test("[REQ_001] underscore tag")`, a Rust `#[doc = "[API-02]"]` above `#[test]`, or a Python docstring. Tags are read in files in test folders or named like tests (`test_*.py`, `*_test.go`, `*.test.ts`).
-- A source citation is an ID after a configured comment marker on the same line, such as `// (ABC-12)`; the parentheses are not required. Svelte also recognizes `<!-- (ABC-12) -->`. The scanner does not track multiline comment boundaries.
+- **Test tag.** Put `[ABC-12]` or `[ABC-12, ABC-14]` in the test title, name, or documentation attribute. For example, use Swift's `@Test("[ABC-12] opens the file")`, Rust's `#[doc = "[ABC-12]"]` above `#[test]`, or a Python docstring. spec17 looks in test folders and files named like tests, such as `test_*.py`, `*_test.go`, and `*.test.ts`.
+- **Source citation.** Put the ID on the same line as the language's comment marker, as in `// (ABC-12)` or Svelte's `<!-- (ABC-12) -->`. Parentheses are optional.
 
-The report also lists tags it distrusts, under invalid tests: an ID no spec defines (`unknown`) or a struck-out one (`retired`), an ID tagged only in comments outside detected tests (`comment-only`), only on a disabled test (`disabled`), or only on a test with no direct assertion (`no-assert`). A citation of an ID no spec defines is a dangling citation when a spec uses the same prefix, which catches typos and retired IDs.
+### Problems in the report
 
-Comments attached to a detected test are listed separately as `comment-tagged`. They are evidence to review and do not count as invalid tests.
+| Result | What spec17 found |
+| --- | --- |
+| `unknown` | A test tag refers to an ID with no definition. |
+| `retired` | A test tag refers to a retired ID. |
+| `comment-only` | All tags for the ID are in comments outside detected tests. |
+| `disabled` | All detected references for the ID are on disabled tests. |
+| `no-assert` | spec17 found no direct assertion in the tagged tests. Check whether a helper makes the assertion. |
+| `comment-tagged` | A comment with the ID is attached to a detected test. The report lists these separately for review. |
+
+A dangling citation is a test tag or source citation for an undefined ID with an active or configured retired prefix. Check it for a typo or a reference to a retired requirement.
 
 ## States
 
 | State | Meaning |
 | --- | --- |
-| `tested` | A test is tagged with the ID |
-| `src-only` | Code cites the ID, no test is tagged |
-| `none` | No test and no code |
-| `manual` | Marked `(manual)`: checked by hand, no test expected |
-| `later` | Marked `(later)` or `(deferred)`: not due yet |
-| `ref` | A reference document: never due |
+| `tested` | A test carries the ID. |
+| `src-only` | Source code cites the ID and no test carries it. |
+| `none` | No test tag or source citation was found. |
+| `manual` | The requirement is marked for manual verification. |
+| `later` | The requirement is deferred. |
+| `ref` | The item is a reference document and is never due. |
 
-A requirement with a check mark also gets a verdict: `NO-TEST` (no tagged test), `NO-LINK` (its tests reach no app code in the CodeGraph index), `ok` (they do), or `unchecked` (there is no index). Every state and verdict is evidence found in the tree, not a statement that the requirement is met.
+For a requirement marked done, the report adds a verdict based on tagged tests and CodeGraph links.
+
+| Verdict | Meaning |
+| --- | --- |
+| `NO-TEST` | No tagged test was found. |
+| `NO-LINK` | The index shows no link from its tests to application code. |
+| `ok` | The index shows a link from its tests to application code. |
+| `unchecked` | No usable CodeGraph index is available. |
+
+These results describe the evidence found in the project. spec17 does not run tests or verify that a requirement is met.
 
 ## Configuration
 
-Most repos need none. To override a detected field, put `spec17.json` at the repo root. `spec17.example.json` shows the common fields (`specs`, `tests`, `src`, `ext`, `profiles`, `retired_prefixes`, `codegraph`); `infra_paths` exists too. A field you set replaces its detected value:
+spec17 detects the project layout by default. Put `spec17.json` at the project root to override the paths or file extensions it scans. Set only the fields you need to change.
 
-```json spec17.example.json
+```json
 {
   "specs": "docs/specs",
   "tests": ["Tests"],
   "src": ["Sources"],
-  "ext": ["swift"],
-  "profiles": [{
-    "name": "swift",
-    "case": "^\\s*@Test\\b|^\\s*func\\s+test",
-    "test": "(^|/)[^/]*Tests?(/|\\.swift$)"
-  }],
-  "retired_prefixes": [],
-  "codegraph": ".codegraph/codegraph.db"
+  "ext": ["swift"]
 }
 ```
 
-Each file is read with the profile of its language: comment markers, `decl`, `assert`, `off`, `test` (which paths are tests) and `case` (the line that opens a test case). `profiles` holds entries shaped like a `[[profile]]` of `core/resources/profiles.toml`: `{"name": "rust", "assert": "assert!|panic!"}` changes only that field of the built-in Rust profile, and a new `name` with `ext` and `comment` adds a language. A field a profile does not have is an error, and so are the old top-level `comment`, `decl`, `assert`, `off`, `case` and `test_files`.
+| Other field | Use it to |
+| --- | --- |
+| `retired_prefixes` | Keep reporting dangling references after retiring an entire ID prefix. |
+| `codegraph` | Set the index path. The default is `.codegraph/codegraph.db`. |
+| `infra_paths` | Set path prefixes under the first source folder that `uncovered` treats as infrastructure. |
+| `priority`, `effort` | Override the patterns for [requirement hints](#priority-and-effort). |
+| `profiles` | Override language detection rules or add a language. |
 
-`annotation` is a regex for a line that attaches to the declaration below it, as a comment above does (`^\s*@` for Swift and Kotlin, `^\s*#\[` for Rust, `^\s*\[` for C#); a tag in a comment above such a line still belongs to the test. A test marker that sits inside a string literal or a trailing comment opens no case. A profile that sets no `annotation` has none.
+To exclude files from the scan, list them in `.aiignore` or `.spec17ignore` using Git ignore syntax. spec17 follows symlinks only within the project root or directories listed in `ALLOWED_PATHS`. Use the platform's path list separator, such as `:` on macOS and Linux.
 
-A language without braces says how a test body ends in its profile: `block_indent` (Python: the first line no deeper than the declaration); `block_open` and `block_close` (nesting, where each match on a line adds or removes a level and the body ends back at 0, as for Ruby `do`/`end` or Lua `function`/`end`); `block_end` (the first line matching it, as for Visual Basic `End Sub`); `block_fence` (a SQL `$$` or `$tag$` region in which nothing counts). Without any of them a body is closed by its braces. `block_indent` cannot be combined with the others, and `block_open` and `block_close` come as a pair; anything else is an error when the repo is opened. A body is looked for only down to the next test's header, so a miscounted body cannot slow the scan down. These are patterns, not a parser: an unusual keyword position can miscount.
+### Language profiles
 
-Each regex field accepts a string or an ordered array of strings, such as `"assert": ["assert!", "panic!"]`. For each input, the first matching pattern wins. Every `decl` pattern needs a capture group 1 for the name. Setting an array replaces that field's built-in patterns.
+To change a built-in profile, add an entry to `profiles` with its name and the fields you want to replace. For example, `{"name": "rust", "assert": ["assert!", "panic!"]}` replaces Rust's assertion patterns. To add a language, use a new name and supply the file extensions and comment markers in `ext` and `comment`.
 
-The requirement-line patterns (`core/resources/spec_format.toml`) and the language profiles (`core/resources/profiles.toml`) are compiled into the binary. To support another language, add a `[[profile]]` and rebuild, or put the same entry in `profiles`.
+| Field | What it matches |
+| --- | --- |
+| `test` | Project-relative paths of test files. |
+| `case` | The line that opens a test case. |
+| `decl` | A declaration. Capture group 1 must contain its name. |
+| `assert`, `off` | Assertions and markers for disabled tests, respectively. |
+| `annotation` | Lines that attach to the declaration below, such as `@Test` or `#[test]`. A comment tag above the annotation can still belong to the test. |
 
-Paths in `.aiignore` or `.spec17ignore` (gitignore syntax) are left out of every scan. Symlinks are followed only inside the repo root or a path in the `ALLOWED_PATHS` environment variable, a `:`-separated list.
+Each regex field accepts one string or an ordered list of strings. spec17 uses the first pattern that matches. Unknown profile fields cause an error. If you have an older configuration, move top-level pattern fields into `profiles` and rename `test_files` to `test`.
+
+By default, spec17 uses braces to find the end of a test body. For other languages, choose the rule that matches the syntax.
+
+| Field | Where the body ends |
+| --- | --- |
+| `block_indent` | The first line with the same or less indentation than the declaration, as in Python. |
+| `block_open` and `block_close` | Where nesting returns to zero, as with Ruby's `do` and `end`. |
+| `block_end` | The first matching line, such as Visual Basic's `End Sub`. |
+| `block_fence` | The closing occurrence of the opening delimiter, such as SQL's `$tag$`. |
+
+Set `block_open` and `block_close` together. Use `block_indent` on its own. See examples in the [built-in language profiles](https://github.com/kpavlov/spec17/blob/main/core/resources/profiles.toml) and [sample configuration](https://github.com/kpavlov/spec17/blob/main/spec17.example.json).
