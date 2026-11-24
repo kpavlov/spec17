@@ -1,44 +1,85 @@
-Copyright (c) 2026 Konstantin Pavlov, IT Staff OÜ. All rights reserved.
+SPEC17 SOURCE-AVAILABLE LICENSE
 
-DEVELOPER EVALUATION AND CONTRIBUTION LICENSE AGREEMENT
--------------------------------------------------------
+Copyright (c) 2026 Konstantin Pavlov, IT Staff OÜ.
 
-1. PURPOSE & GRANT OF LICENSE
-This License allows you to view the source code and run the software locally
-solely for the purposes of personal use, academic research, non-commercial
-public project testing, evaluation, bug reporting, and developing
-contributions (Pull Requests) back to the original project. Subject to these
-terms, the Author grants you a limited, non-exclusive, non-transferable,
-royalty-free license to download and inspect the source code.
+PERMITTED USE
 
-2. ALLOWED CONTRIBUTIONS
-You are permitted to modify the source code locally for the sole purpose of
-submitting bug fixes, optimizations, or feature enhancements back to the Author
-via Pull Requests or patches. By submitting a Pull Request or sending a patch,
-you grant the Author a perpetual, worldwide, non-exclusive, no-charge,
-royalty-free, irrevocable copyright license to reproduce, prepare derivative
-works of, publicly display, and distribute your contributions.
+You may inspect, download, build, and run Spec17 for noncommercial purposes.
+You may fork Spec17 on GitHub under GitHub’s Terms of Service. You may
+modify your fork or a local copy and submit those changes to the
+official project under the contribution terms in CONTRIBUTING.md.
 
-3. STRICT PROHIBITIONS & RESTRICTIONS
-Any use outside of the scope defined in Section 1 is strictly prohibited
-without an explicit, separate Commercial License. You strictly CANNOT:
-a) Production Use: Deploy or run this software, its binaries, or its source code
-   in any live, production, or customer-facing environment for commercial or
-   monetized purposes.
-b) CI/CD & Automation: Execute or integrate this software within any automated
-   Continuous Integration (CI) or Continuous Deployment (CD) pipelines for
-   commercial, corporate, or organizational systems exceeding the limits in 3(d).
-c) Derivative Works: Modify, transform, or split the code to create standalone
-   forks, competing products, alternative branches, or spin-off projects for
-   public or private distribution.
-d) Enterprise Use: Permit any use, evaluation, testing, or modification of the
-   software within or on behalf of a business entity with a total annual gross
-   turnover/revenue exceeding $1,000,000 USD equivalent or more than 15
-   employees.
+A business or other organization may use Spec17 free of charge for its own
+commercial work if it meets both of these conditions:
+- Fewer than 20 people work in the organization, including employees,
+  working owners, and regular contractors.
+- Its total gross revenue for the preceding 12 months is less than USD 1,000,000
+  or the equivalent in other currencies.
+Count headcount and revenue across the organization and all entities that control it,
+that it controls, or that are under common control with it. The free grant covers
+use on multiple repositories, on users’ machines, and in the organization’s CI.
+It does not extend to operating Spec17 on behalf of a customer that does not qualify.
 
-4. COMMERCIAL AND ENTERPRISE LICENSING
-Any production deployment, CI/CD pipeline execution, enterprise use, or use by
-an entity exceeding the limits in Section 3 requires a paid, explicit
-Commercial License from the Author.
+COMMERCIAL LICENSE
 
-To obtain a production or enterprise license, please contact: info@itstaff.ee
+Commercial use includes use in the course of business or professional
+work, including internal development and CI. It requires a separate
+written license from IT Staff OÜ unless permitted under PERMITTED USE
+or EVALUATION. The commercial agreement sets the price and the scope
+of permitted use, including users, repositories, and automation as applicable.
+
+EVALUATION
+
+An organization of any size may use Spec17 free of charge for 32 consecutive days to evaluate
+it for internal use, including on its own private repositories and in CI.
+The period starts with the organization's first use under this grant. It does not restart
+for another user, repository, installation, or release.
+
+After the evaluation ends, continued use must qualify under another
+grant in this license or be covered by a separate written license.
+
+DISTRIBUTION
+
+You may share reports produced with Spec17. This license does not grant permission
+to redistribute, resell, or bundle Spec17, publish modified copies,
+or make Spec17 available as a service to others.
+Rights under applicable law, the terms of the hosting platform,
+and separate licenses still apply.
+
+AGENT SKILL
+
+The skill at skills/spec17/SKILL.md is separately licensed under the MIT License.
+You may install, modify, commit, and distribute it in public or private repositories,
+including commercial repositories, under its MIT terms.
+Keep its copyright and permission notices with copies or substantial portions of the skill.
+These permissions apply to the skill only.
+
+SCOPE AND RESERVED RIGHTS
+
+IT Staff OÜ is the licensor. This license applies to Spec17 source code
+and binaries released under it. All rights not expressly granted are
+reserved. Rights granted under this license are non-exclusive and may
+not be transferred or sublicensed.
+
+The agent skill and third-party components are governed by their own
+licenses. A separate written commercial agreement governs use within
+the scope of that agreement.
+
+VIOLATIONS
+
+If you violate these terms, IT Staff OÜ may notify you in writing.
+For a first violation, your rights under this license end 32 days
+after you receive notice unless you correct the violation and take
+reasonable steps to remedy its effects within that period. For a
+subsequent violation, IT Staff OÜ may terminate those rights by
+written notice. The cure period does not authorize continued use
+outside the scope of this license.
+
+NO LIABILITY
+
+As far as the law allows, the software comes as is, without any
+warranty or condition, and the licensor will not be liable to you
+for any damages arising out of these terms or the use or nature
+of the software, under any kind of legal claim.
+
+Commercial licenses and other permissions: info@itstaff.ee
