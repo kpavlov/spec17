@@ -5,13 +5,13 @@ weight: 30
 
 An AI coding assistant can query spec17 through the Model Context Protocol (MCP). The bundled skill tells the assistant which tools to use and how to fall back to the command line.
 
-The MCP server also exposes the bundled skill through the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview), at `skill://spec17/SKILL.md`. Clients that support the extension can discover and load it from either transport. Client support varies; the install commands below also make the skill available on disk.
+The MCP server also exposes the bundled skill through the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview), at `skill://spec17/SKILL.md`, with its reference files at `skill://spec17/references/*.md`. Clients that support the extension can discover and load it from either transport. Client support varies; the install commands below also make the skill available on disk.
 
 ## Install the skill and an MCP entry
 
 ```sh
 spec17 install              # repo skill + HTTP entry in <repo>/.mcp.json
-spec17 install --global     # ~/.agents/skills/spec17/SKILL.md + HTTP entry in ~/.mcp.json
+spec17 install --global     # ~/.agents/skills/spec17/ (SKILL.md, references/) + HTTP entry in ~/.mcp.json
 spec17 install --codegraph  # only adds the codegraph MCP server
 spec17 uninstall            # remove the repo skill and HTTP entry
 spec17 uninstall --global   # only the global skill; add --only mcp for the entry in ~/.mcp.json
@@ -25,7 +25,9 @@ spec17 uninstall --global   # only the global skill; add --only mcp for the entr
 - **HTTP** — Run `spec17` and leave it running. By default, the dashboard is at `http://127.0.0.1:7411/` and the MCP endpoint is at `http://127.0.0.1:7411/mcp`.
 
 > [!WARNING]
-> **Use stdio on shared computers.** The HTTP server accepts connections from the same computer without a login. Other local users and processes can read project data and call tools that modify files. Those tools run with the permissions of the user who started spec17.
+> **Use stdio on shared computers.** The HTTP server accepts connections from the same computer without a login. 
+> Other local users and processes can read project data and call tools that modify files.
+> Those tools run with the permissions of the user who started spec17.
 
 An HTTP server serves the project it opened at startup. Check the project path in the dashboard header. To serve multiple projects, give each its own port and run each server in a separate terminal. Use the same port for `install` and `serve`:
 

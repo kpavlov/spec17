@@ -12,3 +12,5 @@ docs/public/
 docs/screenshots/
 docs/resources/
 .hugo_build.lock
+.env
+skills/reports/

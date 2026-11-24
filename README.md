@@ -80,7 +80,7 @@ SKIP_WEB_BUILD=1 cargo install --path server --locked   # or: cargo build --rele
 core/     spec17-core: scan, config, report, coverage, codegraph (the only SQL)
 server/   spec17 binary: CLI, axum API, MCP (rmcp), UI serving
 web/      Svelte 5 + Vite (no SvelteKit), builds to one dist/index.html
-skills/   the agent skill (SKILL.md), embedded in the binary
+skills/   the agent skill (SKILL.md + references/), embedded in the binary
 docs/     Hugo site for spec17.dev (make docs); .github/workflows/pages.yml publishes it to GitHub Pages
 bench/    bench.py: before/after timings (make bench)
 ```

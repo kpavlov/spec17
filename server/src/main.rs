@@ -646,8 +646,16 @@ mod tests {
         let served = contents["text"].as_str().unwrap();
         let frontmatter = served.split_inclusive('\n').skip(1).take_while(|line| *line != "---\n").collect::<String>();
         assert_eq!(entry["frontmatter"], yaml_serde::from_str::<serde_json::Value>(&frontmatter).unwrap());
-        let manifest: rmcp::model::SkillResource = serde_json::from_value(entry["resources"][0].clone()).unwrap();
-        manifest.verify(contents["text"].as_str().unwrap().as_bytes()).unwrap();
+        let manifest = entry["resources"].as_array().unwrap();
+        assert_eq!(manifest.len(), skill::FILES.len());
+        for (m, (path, text)) in manifest.iter().zip(skill::FILES) {
+            let m: rmcp::model::SkillResource = serde_json::from_value(m.clone()).unwrap();
+            let file_uri = format!("skill://spec17/{path}");
+            let read = call("resources/read", json!({"uri": file_uri})).await;
+            let served = read["result"]["contents"][0]["text"].as_str().unwrap();
+            assert_eq!(served, text);
+            m.verify(served.as_bytes()).unwrap();
+        }
         let unknown = call("skills/get", json!({"uri":"skill://missing/SKILL.md"})).await;
         assert_eq!(unknown["error"]["code"], -32602);
         let unknown = call("resources/read", json!({"uri":"skill://spec17/missing.md"})).await;

@@ -7,7 +7,14 @@ const NAME: &str = "spec17";
 const STDIO_NAME: &str = "spec17-stdio";
 const STDIO_FLAGS: [&str; 3] = ["--stdio-mcp", "--no-http-mcp", "--no-ui"];
 const CODEGRAPH: &str = "codegraph";
-pub const SKILL: &str = include_str!("../../skills/spec17/SKILL.md");
+/// Every file of the skill, by its path inside the skill folder; `SKILL.md` first (SETUP-12).
+pub const FILES: [(&str, &str); 4] = [
+    ("SKILL.md", include_str!("../../skills/spec17/SKILL.md")),
+    ("references/tools.md", include_str!("../../skills/spec17/references/tools.md")),
+    ("references/conflicts.md", include_str!("../../skills/spec17/references/conflicts.md")),
+    ("references/config.md", include_str!("../../skills/spec17/references/config.md")),
+];
+pub const SKILL: &str = FILES[0].1;
 
 /// `<repo>/.agents/skills` or `~/.agents/skills`.
 pub fn skills_dir(root: Option<&Path>, global: bool) -> Result<PathBuf, String> {
@@ -20,21 +27,30 @@ pub fn skills_dir(root: Option<&Path>, global: bool) -> Result<PathBuf, String> 
 
 pub fn install(dir: &Path) -> Result<PathBuf, String> {
     let d = dir.join(NAME);
-    std::fs::create_dir_all(&d).map_err(|e| format!("{}: {e}", d.display()))?;
-    let f = d.join("SKILL.md");
-    std::fs::write(&f, SKILL).map_err(|e| format!("{}: {e}", f.display()))?;
-    Ok(f)
+    for (path, text) in FILES {
+        let f = d.join(path);
+        let parent = f.parent().unwrap_or(&d);
+        std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        std::fs::write(&f, text).map_err(|e| format!("{}: {e}", f.display()))?;
+    }
+    Ok(d.join("SKILL.md"))
 }
 
-/// Removes only the file we wrote, and the folder if that leaves it empty: anything else the user put there stays.
+/// Removes only the files we wrote, and the folders that leaves empty: anything else the user put there stays.
 pub fn uninstall(dir: &Path) -> Result<Option<PathBuf>, String> {
     let d = dir.join(NAME);
     let f = d.join("SKILL.md");
     if !f.exists() {
         return Ok(None);
     }
-    std::fs::remove_file(&f).map_err(|e| format!("{}: {e}", f.display()))?;
-    let _ = std::fs::remove_dir(&d); // fails (and is kept) when it still holds other files
+    for (path, _) in FILES {
+        let p = d.join(path);
+        if p.exists() {
+            std::fs::remove_file(&p).map_err(|e| format!("{}: {e}", p.display()))?;
+        }
+    }
+    let _ = std::fs::remove_dir(d.join("references")); // these fail (and are kept) when they still hold other files
+    let _ = std::fs::remove_dir(&d);
     Ok(Some(f))
 }
 
@@ -199,10 +215,13 @@ struct StdioLaunch {
 }
 
 fn skill_state(dir: &Path) -> SkillState {
-    match std::fs::read_to_string(dir.join(NAME).join("SKILL.md")) {
-        Ok(t) if t == SKILL => SkillState::Current,
-        Ok(_) => SkillState::Outdated,
-        Err(_) => SkillState::Missing,
+    let d = dir.join(NAME);
+    if !d.join("SKILL.md").exists() {
+        return SkillState::Missing;
+    }
+    match FILES.iter().all(|(path, text)| std::fs::read_to_string(d.join(path)).is_ok_and(|t| t == *text)) {
+        true => SkillState::Current,
+        false => SkillState::Outdated,
     }
 }
 
@@ -365,8 +384,12 @@ mod tests {
     #[doc = "[API-17]"]
     #[test]
     fn the_skill_lists_every_tool() {
+        let (_, tools) = FILES.iter().find(|(p, _)| *p == "references/tools.md").unwrap();
         for t in crate::ops::tools().iter() {
-            assert!(SKILL.contains(&format!("`{}`", t.name)), "skills/spec17/SKILL.md does not list the `{}` tool", t.name);
+            assert!(tools.contains(&format!("| `{}` |", t.name)), "skills/spec17/references/tools.md does not list the `{}` tool", t.name);
+        }
+        for (path, _) in &FILES[1..] {
+            assert!(SKILL.contains(&format!("`{path}`")), "SKILL.md does not point to {path}");
         }
     }
 
@@ -391,9 +414,11 @@ mod tests {
         let f = install(&dir).unwrap();
         assert_eq!(std::fs::read_to_string(&f).unwrap(), SKILL);
         install(&dir).unwrap();
+        let tools = dir.join("spec17/references/tools.md");
+        assert_eq!(std::fs::read_to_string(&tools).unwrap(), FILES[1].1);
         std::fs::write(dir.join("spec17/notes.txt"), "mine").unwrap();
         assert_eq!(uninstall(&dir).unwrap(), Some(f.clone()));
-        assert!(!f.exists() && dir.join("spec17/notes.txt").exists());
+        assert!(!f.exists() && !tools.exists() && !dir.join("spec17/references").exists() && dir.join("spec17/notes.txt").exists());
         assert_eq!(uninstall(&dir).unwrap(), None);
     }
 
