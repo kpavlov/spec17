@@ -7,7 +7,7 @@ Read this when you need a tool's arguments, its CLI form, or how to read `status
 | Tool | Arguments | Same as CLI |
 |---|---|---|
 | `report` | `limit` | `spec17 report [--limit N]` |
-| `status` | `spec`, `prefix`, `all`, `missing`, `changed` (git ref), `staged`, `include_untracked`, `built`, `done`, `unproven`, `issues`, `effort`, `limit` | `spec17 status [flags]` |
+| `status` | `spec`, `prefix`, `all`, `missing`, `changed` (git ref), `staged`, `include_untracked`, `ignore_whitespace`, `built`, `done`, `unproven`, `issues`, `effort`, `limit` | `spec17 status [flags]` |
 | `changes` | `ref`, `commit`, `staged`, `include_untracked`, `ignore_whitespace`, `show_ignored`, `show_all` | `spec17 changes [--ref R] [--commit C] [--staged] [--no-untracked]`: the changed files (added, modified, deleted, renamed with `old_path`; staged, unstaged, both, untracked or committed) and the requirements the changed lines touch, with a note per file (bullet edited or removed, test tag added or changed, citation added or removed, or a changed source file a tagged test reaches in the CodeGraph index, which is weaker: nothing there was edited). Edits that only re-wrap or re-indent are not listed. `ref=main` shows everything on a branch since main; `commit=<sha>` explains one commit; `show_all` adds files spec17 does not scan |
 | `diff` | `path` (a file `changes` lists) and the arguments of `changes` | `spec17 diff PATH`, like `git diff REF -- PATH`, with a line under each hunk naming the requirements it touches |
 | `history` | `base`, `head`, `limit` | `spec17 history`, like `git log BASE..HEAD` (base: main or master), newest first, plus how many files are uncommitted; explain one with `changes commit=<sha>` |
@@ -73,7 +73,7 @@ Verdicts of a check-marked requirement:
 States:
 - `tested`: a `[ID]` tag exists. Run the suite to know whether it passes.
 - `src-only`, `none`.
-- `manual`: checked by a person.
+- `manual`: the bullet ends in `(manual)`, marking the requirement for manual verification.
 - `later`: the bullet ends in `(later)` or `(deferred)`. A marker inside struck-through text is ignored.
 - `ref`: a reference doc, either markdown linked as `[ADR-0003](decisions/0003-x.md)` or a file in `decisions/`/`adr/`. Never due, may be outdated, so read it before relying on it.
 

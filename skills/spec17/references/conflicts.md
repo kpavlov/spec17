@@ -29,7 +29,7 @@ The review needs strong enough model. If you are not that model and cannot hand 
 For each pair within scope:
 
 1. **Understand the current code first.** Read:
-   - the declaration and what it does (`codegraph_explore "<Name>"`), with its callers and callees;
+   - the declaration, its callers and its callees. The CodeGraph MCP server provides `codegraph_explore` (spec17 setup option `server=codegraph`). If the tool is unavailable, read the declaration and follow the calls in source;
    - the tests tagged with either ID (`trace`);
    - any other code that cites either ID.
 

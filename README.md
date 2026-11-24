@@ -9,6 +9,12 @@ Deterministic spec-driven-development evidence for a repo: which requirement IDs
 > **Evidence, not truth.** A citation or test tag does not prove a requirement is implemented or that its test passes. Output is a candidate list for a human or an assessor to judge.
 
 One Rust binary gives three interfaces over the same core: a CLI, an MCP server (streamable HTTP or stdio) and a web dashboard.
+The MCP server also exposes the dashboard as an MCP App in compatible clients.
+
+- Scan several requirement formats and detect test tags, code citations, priority and effort hints.
+- Filter requirements and tests, explore references between requirements (including cycles), and inspect changes and related evidence.
+- Use the bundled agent skill over MCP or install it locally. Its review guidance separates code evidence, test assertions and tests actually run.
+- Optionally use a CodeGraph index to explore related code, potential overlap and uncovered declarations.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/static/img/dashboard-dark.png">

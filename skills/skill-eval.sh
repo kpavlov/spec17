@@ -1,8 +1,12 @@
+#!/bin/sh
+set -e
+
 ### https://docs.nvidia.com/skills/skillevaluator/
 
 export SKILL_EVAL_LLM_PROVIDER=openai
 
-. "$(dirname "$0")/../.env" || exit 1
+CDPATH= cd -- "$(dirname -- "$0")" || exit 1
+. ../.env
 export OPENAI_API_KEY
 
 rm -rf reports

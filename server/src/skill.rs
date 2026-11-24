@@ -40,14 +40,17 @@ pub fn install(dir: &Path) -> Result<PathBuf, String> {
 pub fn uninstall(dir: &Path) -> Result<Option<PathBuf>, String> {
     let d = dir.join(NAME);
     let f = d.join("SKILL.md");
-    if !f.exists() {
-        return Ok(None);
-    }
+    let mut removed = false;
     for (path, _) in FILES {
         let p = d.join(path);
-        if p.exists() {
-            std::fs::remove_file(&p).map_err(|e| format!("{}: {e}", p.display()))?;
+        match std::fs::remove_file(&p) {
+            Ok(()) => removed = true,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(format!("{}: {e}", p.display())),
         }
+    }
+    if !removed {
+        return Ok(None);
     }
     let _ = std::fs::remove_dir(d.join("references")); // these fail (and are kept) when they still hold other files
     let _ = std::fs::remove_dir(&d);
@@ -416,6 +419,7 @@ mod tests {
         install(&dir).unwrap();
         let tools = dir.join("spec17/references/tools.md");
         assert_eq!(std::fs::read_to_string(&tools).unwrap(), FILES[1].1);
+        std::fs::remove_file(&f).unwrap(); // Retry after the entrypoint was already removed.
         std::fs::write(dir.join("spec17/notes.txt"), "mine").unwrap();
         assert_eq!(uninstall(&dir).unwrap(), Some(f.clone()));
         assert!(!f.exists() && !tools.exists() && !dir.join("spec17/references").exists() && dir.join("spec17/notes.txt").exists());
