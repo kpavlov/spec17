@@ -4,23 +4,23 @@ class Spec17 < Formula
   license :cannot_represent
 
   # Begin stable release
-  version "0.2.0"
+  version "0.3.0"
 
   on_macos do
     on_arm do
-      url "https://github.com/kpavlov/spec17/releases/download/v0.2.0/spec17-0.2.0-darwin-aarch64.tar.gz"
-      sha256 "33bc9091157a9b3195e565d622241c037bbf391044358bd4e3b7685d2c04297b"
+      url "https://github.com/kpavlov/spec17/releases/download/v0.3.0/spec17-0.3.0-darwin-aarch64.tar.gz"
+      sha256 "f64d549032459253c47072d84f786cb6d57a73036177d4d0adbed3d83f6a2c04"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/kpavlov/spec17/releases/download/v0.2.0/spec17-0.2.0-linux-aarch64.tar.gz"
-      sha256 "630dd16c7176521652249d0448b82cde1fefc1d872e7e137dcc22e9a68e17ae4"
+      url "https://github.com/kpavlov/spec17/releases/download/v0.3.0/spec17-0.3.0-linux-aarch64.tar.gz"
+      sha256 "8bbaf340eb237f8f4c5d2f5e54cc8e63af0f181fa4ebe4d1cfa84353245f909b"
     end
     on_intel do
-      url "https://github.com/kpavlov/spec17/releases/download/v0.2.0/spec17-0.2.0-linux-x86_64.tar.gz"
-      sha256 "e769aeff411d90d97236163899fbd68638ff408c432dbcdd8ff17a997f81fbec"
+      url "https://github.com/kpavlov/spec17/releases/download/v0.3.0/spec17-0.3.0-linux-x86_64.tar.gz"
+      sha256 "a4abc999c22f865a1d71c3853eeca5e815aca710931c93163a92efe3cb52ee7d"
     end
   end
 
