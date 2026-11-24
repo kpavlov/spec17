@@ -14,3 +14,4 @@ docs/resources/
 .hugo_build.lock
 .env
 skills/reports/
+.agents/skills/spec17
