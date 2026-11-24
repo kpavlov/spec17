@@ -1,29 +1,23 @@
 # spec17
 
-https://spec17.dev
+[spec17.dev](https://spec17.dev)
 
 [![build](https://github.com/kpavlov/spec17/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/kpavlov/spec17/actions/workflows/build.yml)
 
-Deterministic spec-driven-development evidence for a repo: which requirement IDs in `specs/*.md` have tests, code citations, spec problems, or overlap with other requirements. No LLM in the core.
+spec17 links requirements in Markdown to tagged tests and source comments. It helps you find missing test tags, spot stale references, and see which requirements a Git change touches. The scanner produces the same results for the same inputs and runs without an LLM.
 
-> **Evidence, not truth.** A citation or test tag does not prove a requirement is implemented or that its test passes. Output is a candidate list for a human or an assessor to judge.
+> **Evidence, not truth.** A citation or tag shows where a requirement is referenced. spec17 does not run tests or verify that a requirement is met.
 
-One Rust binary gives three interfaces over the same core: a CLI, an MCP server (streamable HTTP or stdio) and a web dashboard.
-The MCP server also exposes the dashboard as an MCP App in compatible clients.
-
-- Scan several requirement formats and detect test tags, code citations, priority and effort hints.
-- Filter requirements and tests, explore references between requirements (including cycles), and inspect changes and related evidence.
-- Use the bundled agent skill over MCP or install it locally. Its review guidance separates code evidence, test assertions and tests actually run.
-- Optionally use a CodeGraph index to explore related code, potential overlap and uncovered declarations.
+Use spec17 from the CLI, the web dashboard, or an assistant connected through MCP over HTTP or stdio. Compatible MCP clients can open the dashboard as an MCP App. An optional CodeGraph index adds test-to-code links and helps find overlap and uncovered declarations.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/static/img/dashboard-dark.png">
-  <img alt="spec17 dashboard: 97% of due requirements have a tagged test, with unimplemented, unproven, invalid-test, spec-issue and dangling-citation problems listed" src="docs/static/img/dashboard-light.png">
+  <img alt="spec17 dashboard showing tagged test coverage and the problems found in a project" src="docs/static/img/dashboard-light.png">
 </picture>
 
 ## Quickstart
 
-Add the Homebrew tap and install the latest release (prebuilt for Apple Silicon macOS and for Linux on arm64 and x86_64).
+Install a prebuilt release with Homebrew on an Apple Silicon Mac or on Linux (arm64 or x86_64). For other platforms, see [Build from source](https://spec17.dev/quickstart/#build-from-source).
 
 ```sh
 brew tap kpavlov/spec17 https://github.com/kpavlov/spec17
@@ -31,7 +25,7 @@ brew install kpavlov/spec17/spec17
 spec17 --version
 ```
 
-For the rolling development build (Apple Silicon only), use `kpavlov/spec17/spec17-dev` instead; the two conflict, so uninstall one before the other.
+For a prebuilt development version on Apple Silicon, install `kpavlov/spec17/spec17-dev`. Both formulas install `spec17`, so uninstall one before switching to the other.
 
 From the project you want to scan, run `spec17 report` for a terminal summary or `spec17` to open the dashboard.
 
@@ -41,23 +35,23 @@ spec17 report
 spec17
 ```
 
-To connect an agent, run `spec17 install` (repo skill + HTTP entry in `.mcp.json`) and keep `spec17` running.
+To connect a client that reads `.mcp.json`, run `spec17 install` from the project root and keep `spec17` running. For stdio and manual configuration, see [MCP setup](https://spec17.dev/agents/).
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/static/img/changes-dark.png">
-  <img alt="Changes view: requirements a working-tree edit may affect, with spec edited, spec added and src changed badges" src="docs/static/img/changes-light.png">
+  <img alt="Changes view listing edited requirements and source files" src="docs/static/img/changes-light.png">
 </picture>
 
 ## Documentation
 
-- [Quickstart](https://spec17.dev/quickstart/): install, scan, a three-file example.
-- [Usage](https://spec17.dev/usage/): every command, the dashboard and its URLs, CodeGraph, doctor.
-- [Specs and tests](https://spec17.dev/specs/): requirement styles, test tags, citations, states, `spec17.json`.
-- [Agents](https://spec17.dev/agents/): the skill, HTTP and stdio MCP clients, tools and resources.
+- [Install spec17 and scan a sample project](https://spec17.dev/quickstart/)
+- [Look up CLI commands, dashboard options, and CodeGraph setup](https://spec17.dev/usage/)
+- [Write requirements, tag tests, and configure the scanner](https://spec17.dev/specs/)
+- [Connect an MCP client and look up its tools and resources](https://spec17.dev/agents/)
 
 ## Develop
 
-Needs Rust (stable), Node and pnpm (pinned by `packageManager` in `web/package.json`). The release build embeds the web UI; the binary needs none of the three at runtime. `ROOT` defaults to this repo: spec17 scans itself (see `specs/` and `spec17.json`).
+To build spec17, install stable Rust, Node.js, and the pnpm version pinned in `web/package.json`. The release binary embeds the dashboard and runs without these build tools. Development commands scan this repository by default.
 
 ```sh
 make dev                      # Vite HMR + Rust server on :7411, opens the browser
@@ -66,10 +60,9 @@ make build                    # target/release/spec17
 make install                  # cargo install into ~/.cargo/bin (make uninstall to remove)
 make report                   # text report
 make test                     # cargo tests
-make parity                   # Rust output == the old Python scripts' output (needs them vendored in ROOT)
-make bench                    # time the scan at main vs HEAD (see Benchmark)
+make bench                    # compare scan times at main and HEAD
 make docs                     # build the Hugo site in docs/ into docs/public (Hugo >= 0.146)
-make site                     # Hugo dev server with live reload on :1313, opens the browser (OPEN=0: not)
+make site                     # preview the docs at localhost:1313
 make dev ROOT=/path/to/repo PORT=7500 OPEN=0
 ```
 
@@ -80,16 +73,14 @@ Without `make`:
 SKIP_WEB_BUILD=1 cargo install --path server --locked   # or: cargo build --release, then target/release/spec17
 ```
 
-`SKIP_WEB_BUILD=1` skips the UI build that `build.rs` runs for release builds, once `web/dist` exists. In debug builds the server proxies the UI to Vite (`localhost:5173`).
+`SKIP_WEB_BUILD=1` reuses an existing build in `web/dist`. Debug builds serve the dashboard through Vite at `localhost:5173`.
 
-```
-core/     spec17-core: scan, config, report, coverage, codegraph (the only SQL)
-server/   spec17 binary: CLI, axum API, MCP (rmcp), UI serving
-web/      Svelte 5 + Vite (no SvelteKit), builds to one dist/index.html
-skills/   the agent skill (SKILL.md + references/), embedded in the binary
-docs/     Hugo site for spec17.dev (make docs); .github/workflows/pages.yml publishes it to GitHub Pages
-bench/    bench.py: before/after timings (make bench)
-```
+- `core/` contains the scanner and reports.
+- `server/` contains the CLI and MCP server.
+- `web/` contains the Svelte dashboard.
+- `skills/` contains the bundled agent skill.
+- `docs/` contains the Hugo site for spec17.dev.
+- `bench/` contains the benchmark script.
 
 ## Releases
 
@@ -108,7 +99,7 @@ git checkout v0.1.0
 make upload TAG=v0.1.0
 ```
 
-Once all uploads finish, dispatch tap generation. It verifies the Linux and Windows assets and at least one Mac archive against their uploaded checksums, then pushes `Formula/spec17.rb` to the default branch. Rerun it if you replace an archive. After the tap run succeeds, promote the release by hand:
+After all uploads finish, run the tap workflow. It verifies the release archives and updates `Formula/spec17.rb` on the default branch. Rerun it if you replace an archive. When the workflow succeeds, promote the prerelease.
 
 ```sh
 gh workflow run tap.yml -f tag=v0.1.0
@@ -140,7 +131,7 @@ If the repository is private, set `HOMEBREW_GITHUB_API_TOKEN` to a token with re
 
 ## Benchmark
 
-`make bench` times the CLI on a generated repo at several git revisions, so a change can be compared with a baseline. Each command is a full load (`Analysis::load`), so the numbers are mostly scan time.
+`make bench` compares CLI wall time across Git revisions using the same generated repository. Each invocation includes a full scan.
 
 ```sh
 make bench                                      # main vs HEAD, scale 1, 10 runs
@@ -149,12 +140,9 @@ make bench JSON=1                               # one JSON document instead of a
 python3 bench/bench.py --help
 ```
 
-- The repo is generated deterministically under `target/bench/repo-<scale>`: bullet specs only (so old and new revisions read it the same way) with non-ASCII text, source files citing requirements, test files tagging them, and markdown docs; no CodeGraph index. Scale 1 is 2,000 requirements, 400 source files, 100 test files and 100 docs.
-- Each revision is built once (release, no web UI) and cached in `target/bench/bin`; `.` is rebuilt every run. Revisions are exported with `git archive`, so nothing is written to `.git`.
-- The first revision listed is the baseline. The table has median, min and stdev in ms, the change of the median against the baseline, and a hash of each command's output; the run says whether the output is the same for every revision. A speed-up must not change the output.
-- Stdlib Python only.
+The first revision is the baseline. Compare the median times and check the output hashes to confirm that the results still match. The benchmark uses release builds, Python's standard library, and bullet specs without a CodeGraph index.
 
-Latest result of `make bench REVS="." SCALE=4 RUNS=10`: scale 4 (8,000 requirements, 1,600 source files, 400 test files, 400 docs), wall time per command in ms, one macOS machine, so the absolute times only mean something on that machine.
+Example from `make bench REVS="." SCALE=4 RUNS=10` on one Mac. The project had 8,000 requirements, 1,600 source files, 400 test files, and 400 docs. Times are in milliseconds.
 
 | command | median | min | stdev |
 |---|--:|--:|--:|
@@ -162,7 +150,4 @@ Latest result of `make bench REVS="." SCALE=4 RUNS=10`: scale 4 (8,000 requireme
 | `status --all` | 148.1 | 145.5 | 2.4 |
 | `trace GEN-0001` | 123.1 | 121.7 | 1.7 |
 
-- Runs differ by a few percent from one session to the next on the same machine (the stdev column shows the spread within one), so read differences under about 3% as noise.
-- The generated repo does not cover a test whose nesting never balances (a Ruby `unless` without its `end`). Measured separately on a generated Ruby file of 800 tests: searching each body to the end of the file took 130 ms; searching only down to the next test's header takes 15 ms, the same as 800 balanced tests.
-
-The 1-second change poll behind `resources/updated` is not covered: the CLI does not expose it.
+On that machine, runs varied by a few percent between sessions. Treat differences under about 3% as noise for this workload.
