@@ -2,9 +2,9 @@ class Spec17Dev < Formula
   desc "Prebuilt development version of spec17 for Apple Silicon"
   homepage "https://spec17.dev"
   license :cannot_represent
-  url "https://github.com/kpavlov/spec17/releases/download/edge/spec17-dev.20261121122323-darwin-aarch64.tar.gz"
-  version "20261121122323"
-  sha256 "2c4da5dacaf66fd84725e90747aabf859cf5e2640b375827543153e4bbc4e325"
+  url "https://github.com/kpavlov/spec17/releases/download/edge/spec17-dev.20261124091448-darwin-aarch64.tar.gz"
+  version "20261124091448"
+  sha256 "62d79c3734273ddfd3106f4570afe2a1665f6bd0a0ae0aa132de3301bf0b647f"
 
   depends_on :macos
   depends_on arch: :arm64

@@ -2,6 +2,8 @@ name: build
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - Formula/**
   pull_request:
     # code, specs (the dogfood scan reads them) and build inputs only; not docs, README, Formula, bench
     paths:
