@@ -7,7 +7,7 @@
 export const TABS = ["dashboard", "changes", "requirements", "modules", "tests", "overlap", "uncovered", "settings"] as const;
 export type Tab = (typeof TABS)[number] | "code";
 
-export type Route = { tab: Tab; id?: string; file?: string; path?: string; line?: number; view?: string; state?: string; level?: string; q?: string; module?: string; requirementId?: string; changed?: string; reviewed?: string; staged?: string; untracked?: string; ref?: string; commit?: string; ws?: string; ignored?: string; all?: string };
+export type Route = { tab: Tab; id?: string; file?: string; path?: string; line?: number; view?: string; state?: string; level?: string; priority?: string; effort?: string; q?: string; module?: string; requirementId?: string; changed?: string; reviewed?: string; staged?: string; untracked?: string; ref?: string; commit?: string; ws?: string; ignored?: string; all?: string };
 
 export function parse(url: URL): Route {
   const [raw, second] = url.pathname.split("/").filter(Boolean).map(decodeURIComponent);
@@ -25,6 +25,8 @@ export function parse(url: URL): Route {
     view: p.get("view") ?? (raw === "specs" ? "docs" : undefined),
     state: p.get("state") ?? undefined,
     level: p.get("level") ?? undefined,
+    priority: p.get("priority") ?? undefined,
+    effort: p.get("effort") ?? undefined,
     q: p.get("q") ?? undefined,
     module: p.get("module") ?? undefined,
     requirementId: tab === "tests" ? p.get("requirement_id") ?? undefined : undefined,
@@ -50,6 +52,8 @@ export function format(r: Route): string {
   put("line", r.line);
   if (r.state && r.state !== "all") put("state", r.state);
   put("level", r.level);
+  put("priority", r.priority);
+  put("effort", r.effort);
   put("q", r.q);
   put("module", r.module);
   put("requirement_id", r.requirementId);

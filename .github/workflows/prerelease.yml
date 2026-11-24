@@ -71,8 +71,9 @@ jobs:
           mkdir dist
           if [ "$RUNNER_OS" = Windows ]; then
             (cd target/release && 7z a -tzip "../../dist/$N.zip" spec17.exe)
+            7z a -tzip "dist/$N.zip" LICENSE NOTICES
           else
-            tar -czf "dist/$N.tar.gz" -C target/release spec17
+            tar -czf "dist/$N.tar.gz" -C target/release spec17 -C "$GITHUB_WORKSPACE" LICENSE NOTICES
           fi
           (cd dist && for f in "$N".*; do sha256sum "$f" > "$f.sha256"; done)
       - name: Upload to the prerelease

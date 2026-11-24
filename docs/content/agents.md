@@ -5,6 +5,8 @@ weight: 30
 
 An AI coding assistant can query spec17 through the Model Context Protocol (MCP). The bundled skill tells the assistant which tools to use and how to fall back to the command line.
 
+The MCP server also exposes the bundled skill through the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview), at `skill://spec17/SKILL.md`. Clients that support the extension can discover and load it from either transport. Client support varies; the install commands below also make the skill available on disk.
+
 ## Install the skill and an MCP entry
 
 ```sh

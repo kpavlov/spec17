@@ -5,6 +5,7 @@ use crate::detect;
 use indexmap::IndexMap;
 use regex::Regex;
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::{cell::{OnceCell, RefCell}, collections::HashMap, path::{Path, PathBuf}, process::Command, rc::Rc};
 
 /// An identifier of 4+ characters: what the tests of a requirement name.
@@ -18,6 +19,8 @@ pub struct Format {
     pub level: String,
     pub block_level: String,
     pub done: String,
+    pub priority: Vec<String>,
+    pub effort: Vec<String>,
     pub line: Vec<String>,
     pub block: Vec<String>,
     pub removed: String,
@@ -46,6 +49,8 @@ pub struct Line {
     /// with an optional `:`. Group 1 is the ID, group 2 the rest of the line.
     pub head: Regex,
     pub level: Regex,
+    priority: Patterns,
+    effort: Patterns,
     /// The level in a heading or paragraph block: EARS `shall` in lower case counts too.
     block_level: Regex,
     /// A `block` opener of `spec_format.toml`: a heading or paragraph whose level may sit on any of its lines.
@@ -65,6 +70,8 @@ pub static LINE: std::sync::LazyLock<Line> = std::sync::LazyLock::new(|| {
     Line {
         head: r(format!(r"^\s*(?:{open})(?:{}\s*)?[*_`]*({})(?-u:\b)[*_`]*[:.]?[*_`]*(.*)", f.done, f.id())),
         level: r(f.level.clone()),
+        priority: Patterns(f.priority.iter().map(|s| r(s.clone())).collect()),
+        effort: Patterns(f.effort.iter().map(|s| r(s.clone())).collect()),
         block_level: r(f.block_level.clone()),
         opens_block: r(format!(r"^\s*(?:{})", f.block.join("|"))),
         wrap_end: r(r"^\s*([-*+] |\d+[.)] |#|\|)".into()),
@@ -146,6 +153,8 @@ pub struct Spec {
     pub end: usize,
     pub level: String,
     pub text: String,
+    pub priority: Option<String>,
+    pub effort: Option<String>,
     /// "" | "manual" | "later"
     pub mark: String,
     pub done: bool,
@@ -185,29 +194,133 @@ impl std::fmt::Display for Issue {
 
 pub type Refs = HashMap<String, Vec<Ref>>;
 
+/// One detected test case, as 0-based line numbers (SCAN-35).
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Case {
+    /// The line that opens the case (`@Test`, `it "..." do`).
+    pub marker: usize,
+    /// The declaration the marker attaches to: the marker itself, or the first declaration below it.
+    pub decl: usize,
+    /// The first line of the comments and annotations attached above the marker.
+    pub head: usize,
+    /// One past the last line of the body.
+    pub end: usize,
+}
+
 /// How the files of one ecosystem read: line-comment markers, the declaration, assertion and switched-off regexes, which paths
 /// are tests and which line opens a test case.
 // (SCAN-33)
 pub struct Lang {
     pub comment: Vec<String>,
-    pub decl: Regex,
-    assert: Regex,
-    off: Regex,
+    pub decl: Patterns,
+    assert: Patterns,
+    off: Patterns,
     /// None when `spec17.json` lists both `src` and `tests` and does not set this profile's `test`: the folders say it all.
-    test: Option<Regex>,
-    pub(crate) case: Regex,
+    test: Option<Patterns>,
+    pub(crate) case: Patterns,
     /// `case` matches a call: the name is its quoted string.
     pub(crate) call: bool,
+    /// A `'` may open a lifetime, not a string (`Profile::lifetimes`).
+    pub(crate) lifetimes: bool,
+    /// (SCAN-35) Lines that attach to the declaration below (`Profile::annotation`).
+    annotation: Patterns,
+    /// (SCAN-35) How a body ends without braces (`Profile::block_*`), and the strings and comments left out when counting.
+    block_indent: bool,
+    block_open: Patterns,
+    block_close: Patterns,
+    block_end: Patterns,
+    block_fence: Patterns,
+    strip: Regex,
+}
+
+pub struct Patterns(Vec<Regex>);
+
+impl Patterns {
+    fn is_match(&self, text: &str) -> bool { self.0.iter().any(|r| r.is_match(text)) }
+    fn count(&self, text: &str) -> usize { self.0.iter().map(|r| r.find_iter(text).count()).sum() }
+    pub(crate) fn captures<'a>(&self, text: &'a str) -> Option<regex::Captures<'a>> { self.0.iter().find_map(|r| r.captures(text)) }
+    /// The first non-empty group 1, trying the patterns in order.
+    fn value<'a>(&self, text: &'a str) -> Option<&'a str> {
+        self.0.iter().flat_map(|r| r.captures_iter(text)).filter_map(|m| m.get(1)).map(|v| v.as_str().trim()).find(|v| !v.is_empty())
+    }
 }
 
 impl Lang {
     fn new(p: &detect::Profile, test: bool) -> Result<Lang, String> {
-        let r = |s: &str| Regex::new(s).map_err(|e| format!("profile {}: bad regex {s}: {e}", p.name));
-        let decl = r(&p.decl)?;
-        if decl.captures_len() < 2 && p.decl != detect::NEVER {
-            return Err(format!("profile {}: decl {} needs a capture group 1 for the declared name", p.name, p.decl));
+        let r = |patterns: &[String]| patterns.iter().map(|s| Regex::new(s).map_err(|e| format!("profile {}: bad regex {s}: {e}", p.name))).collect::<Result<Vec<_>, _>>().map(Patterns);
+        // one way to end a body: indentation, or nesting (both patterns), possibly with an end line and a fence
+        if p.block_indent && !(p.block_open.is_empty() && p.block_close.is_empty() && p.block_end.is_empty() && p.block_fence.is_empty()) {
+            return Err(format!("profile {}: block_indent cannot be combined with block_open, block_close, block_end or block_fence", p.name));
         }
-        Ok(Lang { comment: p.comment.clone(), decl, assert: r(&p.assert)?, off: r(&p.off)?, test: if test { Some(r(&p.test)?) } else { None }, case: r(&p.case)?, call: p.call })
+        if p.block_open.is_empty() != p.block_close.is_empty() {
+            return Err(format!("profile {}: block_open and block_close go together: a level that opens must close", p.name));
+        }
+        let decl = r(&p.decl)?;
+        for (s, regex) in p.decl.iter().zip(&decl.0) {
+            if regex.captures_len() < 2 && s != detect::NEVER {
+                return Err(format!("profile {}: decl {} needs a capture group 1 for the declared name", p.name, s));
+            }
+        }
+        // a string or a line comment, tried left to right: a marker inside a string is no comment
+        let strip = Regex::new(&["\"(?:\\\\.|[^\"\\\\])*\"".to_string(), "'(?:\\\\.|[^'\\\\])*'".to_string()].into_iter().chain(p.comment.iter().map(|c| format!("{}.*", regex::escape(c)))).collect::<Vec<_>>().join("|")).map_err(|e| format!("profile {}: {e}", p.name))?;
+        Ok(Lang {
+            comment: p.comment.clone(), decl, assert: r(&p.assert)?, off: r(&p.off)?, test: if test { Some(r(&p.test)?) } else { None }, case: r(&p.case)?, call: p.call, lifetimes: p.lifetimes, annotation: r(&p.annotation)?,
+            block_indent: p.block_indent, block_open: r(&p.block_open)?, block_close: r(&p.block_close)?, block_end: r(&p.block_end)?, block_fence: r(&p.block_fence)?, strip,
+        })
+    }
+
+    /// Whether byte `at` of `line` sits inside a string literal or a trailing comment.
+    fn inside_literal(&self, line: &str, at: usize) -> bool {
+        self.strip.find_iter(line).any(|t| t.start() < at && at < t.end())
+    }
+
+    /// A comment or an annotation: what attaches to the declaration below it.
+    fn attaches(&self, line: &str) -> bool {
+        self.is_comment(line.trim_start()) || self.annotation.is_match(line)
+    }
+
+    // (SCAN-35) The exclusive end of the body that starts on line `at`, looking no further than line `limit`, when the profile describes one; None: use braces.
+    fn block_end_of(&self, ls: &[String], at: usize, limit: usize) -> Option<usize> {
+        if self.block_indent {
+            let decl = ls[at].len() - ls[at].trim_start().len();
+            // a signature may wrap: the body starts after the line that closes its parentheses
+            let mut open = 0i64;
+            let sig = (at..limit).find(|&i| { let code = self.strip.replace_all(&ls[i], " "); open += code.matches('(').count() as i64 - code.matches(')').count() as i64; open <= 0 }).unwrap_or(at);
+            // a comment line never ends the body, but the comments and blank lines just before the end lie outside it
+            // nor does a line inside a `"""`/`'''` string, or the one that closes it (shortcut: an odd count of fences flips the state)
+            let mut quoted = false;
+            let mut end = (sig + 1..limit).find(|&i| {
+                let inside = quoted;
+                quoted ^= (ls[i].matches("\"\"\"").count() + ls[i].matches("'''").count()) % 2 == 1;
+                let t = ls[i].trim_start();
+                !inside && !t.is_empty() && !self.is_comment(t) && ls[i].len() - t.len() <= decl
+            }).unwrap_or(limit);
+            while end > sig + 1 && { let t = ls[end - 1].trim_start(); t.is_empty() || (self.is_comment(t) && ls[end - 1].len() - t.len() <= decl) } { end -= 1; }
+            return Some(end);
+        }
+        if self.block_open.0.is_empty() && self.block_end.0.is_empty() && self.block_fence.0.is_empty() {
+            return None;
+        }
+        // shortcut: nesting by regex, so a keyword in odd syntax (a Ruby `end` method, a one-line `begin end`) miscounts; a parser is exact
+        let (mut fence, mut depth, mut opened) = (None::<String>, 0i64, false);
+        for (i, line) in ls.iter().enumerate().take(limit).skip(at) {
+            let code = self.strip.replace_all(line, " ");
+            for r in &self.block_fence.0 {
+                for m in r.find_iter(&code) {
+                    match &fence {
+                        Some(tag) if tag == m.as_str() => return Some(i + 1),
+                        None => fence = Some(m.as_str().to_string()),
+                        _ => {}
+                    }
+                }
+            }
+            if fence.is_some() { continue; }
+            let n = self.block_open.count(&code);
+            opened |= n > 0;
+            depth += n as i64 - self.block_close.count(&code) as i64;
+            if self.block_end.is_match(line) || (opened && depth <= 0) { return Some(i + 1); }
+        }
+        Some(limit)
     }
 
     /// The text after the first line-comment marker of `line`.
@@ -265,6 +378,9 @@ pub struct Project {
     pub rx: Rx,
     /// The built-in profiles and those of `spec17.json` (`detect::profiles`).
     pub profiles: Vec<detect::Profile>,
+    /// (SCAN-40) `priority` and `effort` of `spec17.json`; None = the patterns of `spec_format.toml`.
+    priority: Option<Patterns>,
+    effort: Option<Patterns>,
     /// The dominant one: it reads the files no profile knows by extension.
     main: Option<usize>,
     /// One per profile, built on first use.
@@ -281,7 +397,7 @@ pub struct Project {
     /// Repo-relative files of the repo: the CodeGraph file list, else a walk.
     pub files: Vec<String>,
     ignore: detect::Ignore,
-    cache: RefCell<HashMap<String, Rc<Vec<String>>>>,
+    cache: RefCell<HashMap<String, (Rc<Vec<String>>, String)>>,
     /// Repo-relative files under a folder, walked once per folder.
     walked: RefCell<HashMap<String, Rc<Vec<String>>>>,
     /// The index as `open` found it, for `Analysis::load` to take instead of opening it again.
@@ -372,11 +488,16 @@ impl Project {
         for p in profiles.iter().filter(|p| !own(p).is_empty()) {
             Lang::new(p, true)?;
         }
+        let hints = |name: &str, patterns: &[String]| -> Result<Option<Patterns>, String> {
+            if patterns.is_empty() { return Ok(None); }
+            patterns.iter().map(|s| Regex::new(s).map_err(|e| format!("spec17.json: {name}: bad regex {s}: {e}")).and_then(|r| if r.captures_len() < 2 { Err(format!("spec17.json: {name}: {s} needs a capture group 1 for the value")) } else { Ok(r) })).collect::<Result<_, _>>().map(|v| Some(Patterns(v)))
+        };
+        let (priority, effort) = (hints("priority", &cfg.priority)?, hints("effort", &cfg.effort)?);
         let main = cfg.detect(&profiles, &files);
         let rx = Rx::new()?;
         let langs = profiles.iter().map(|_| OnceCell::new()).collect();
         let none = Lang::new(&detect::Profile::unknown(""), false)?;
-        Ok(Project { root, cfg, rx, profiles, main, langs, none, tests_by_path, allow, spec_paths, doc_dirs, files, ignore, cache: RefCell::default(), walked: RefCell::default(), graph: Some(graph), tests: OnceCell::new(), srcs: OnceCell::new(), specs: OnceCell::new(), gone: OnceCell::new() })
+        Ok(Project { root, cfg, rx, profiles, priority, effort, main, langs, none, tests_by_path, allow, spec_paths, doc_dirs, files, ignore, cache: RefCell::default(), walked: RefCell::default(), graph: Some(graph), tests: OnceCell::new(), srcs: OnceCell::new(), specs: OnceCell::new(), gone: OnceCell::new() })
     }
 
     /// The CodeGraph index `open` already looked at (opened again if it was taken before).
@@ -390,13 +511,19 @@ impl Project {
     }
 
     pub fn lines(&self, rel: &str) -> Rc<Vec<String>> {
-        if let Some(l) = self.cache.borrow().get(rel) {
-            return l.clone();
+        self.snapshot(rel).0
+    }
+
+    /// A file's lines, as `read_text` cleans them, and the SHA-256 (hex) of the bytes they were read from: read once.
+    fn snapshot(&self, rel: &str) -> (Rc<Vec<String>>, String) {
+        if let Some(s) = self.cache.borrow().get(rel) {
+            return s.clone();
         }
-        let text = read_text(&self.root.join(rel)).unwrap_or_default();
-        let l = Rc::new(text.lines().map(str::to_owned).collect::<Vec<_>>());
-        self.cache.borrow_mut().insert(rel.to_owned(), l.clone());
-        l
+        let bytes = std::fs::read(self.root.join(rel)).unwrap_or_default();
+        let l = Rc::new(clean(&String::from_utf8_lossy(&bytes)).lines().map(str::to_owned).collect::<Vec<_>>());
+        let s = (l, Sha256::digest(&bytes).iter().map(|b| format!("{b:02x}")).collect::<String>());
+        self.cache.borrow_mut().insert(rel.to_owned(), s.clone());
+        s
     }
 
     fn rel(&self, p: &Path) -> String {
@@ -520,7 +647,7 @@ impl Project {
         let docs = found.into_iter().map(|(id, file)| {
             let stem = file.rsplit('/').next().unwrap_or(&file).trim_end_matches(".md").to_string();
             let text = self.lines(&file).iter().find_map(|l| l.strip_prefix("# ").map(|h| h.trim().to_string())).unwrap_or(stem);
-            Spec { id, file, line: 1, end: 1, level: "DOC".into(), text, mark: "ref".into(), done: false }
+            Spec { id, file, line: 1, end: 1, level: "DOC".into(), text, priority: None, effort: None, mark: "ref".into(), done: false }
         }).collect();
         (docs, linked)
     }
@@ -587,7 +714,10 @@ impl Project {
                 if done && !mark.is_empty() {
                     problems.push(Issue::new(&id, format!("{f}:{n} has a check mark but is also marked ({}/deferred)", if mark == "manual" { "manual" } else { "later" })));
                 }
-                found.insert(id.clone(), Spec { id, file: f.clone(), line: n, end: j, level: lv, text, mark: mark.into(), done });
+                // (SCAN-40)
+                let priority = self.priority.as_ref().unwrap_or(&LINE.priority).value(&text).map(str::to_ascii_uppercase);
+                let effort = self.effort.as_ref().unwrap_or(&LINE.effort).value(&text).map(str::to_string);
+                found.insert(id.clone(), Spec { id, file: f.clone(), line: n, end: j, level: lv, text, priority, effort, mark: mark.into(), done });
             }
         }
         // a line without a level that names a defined ID is a reference to it (a cross-reference table, a review note)
@@ -602,6 +732,46 @@ impl Project {
     /// The requirement IDs of every `[ID]` or `[ID, ID]` tag on `line`, in order.
     pub fn tagged(&self, line: &str) -> Vec<String> {
         self.rx.tag.captures_iter(line).flat_map(|g| self.rx.mention.captures_iter(&g[1]).map(|m| m[1].to_string()).filter(|i| is_id(i)).collect::<Vec<_>>()).collect()
+    }
+
+    /// Whether the CodeGraph index holds this very content of `file`: the SHA-256 it stored equals the file's own. A clock never decides what the text says.
+    // (SCAN-35)
+    pub(crate) fn index_holds(&self, graph: &Graph, file: &str) -> bool {
+        // the hash of the text the scan read, so the ranges are never applied to lines that changed after
+        graph.indexed_hash(file).ok().flatten().is_some_and(|stored| stored.eq_ignore_ascii_case(&self.snapshot(file).1))
+    }
+
+    // (SCAN-35) The test cases of a file, in line order.
+    pub(crate) fn test_ranges(&self, file: &str, graph: Option<&Graph>) -> Vec<Case> {
+        let lang = self.lang(file);
+        let ls = self.lines(file);
+        let decls = graph.filter(|g| !lang.call && self.index_holds(g, file)).and_then(|g| g.test_decls_in(file).ok()).unwrap_or_default();
+        // pass 1: where each case starts
+        let mut cases: Vec<Case> = ls.iter().enumerate().filter_map(|(m, line)| {
+            // a marker inside a string literal (a fixture that writes a test file) or a trailing comment is not a test case
+            let opens = lang.case.0.iter().any(|r| r.find_iter(line).any(|f| !lang.inside_literal(line, f.start())));
+            if !opens || lang.is_comment(line.trim_start()) { return None; }
+            let decl = if lang.call { m } else {
+                (m..ls.len()).take_while(|&i| i == m || lang.decl.is_match(&ls[i]) || lang.attaches(&ls[i]))
+                    .find(|&i| lang.decl.is_match(&ls[i])).unwrap_or(m)
+            };
+            let indent = line.len() - line.trim_start().len();
+            // a declaration above (`@Test func a() {}`) is the previous test, not this one's header
+            let leading = ls[..m].iter().rev().take_while(|l| l.len() - l.trim_start().len() == indent && lang.attaches(l) && !lang.decl.is_match(l)).count();
+            Some(Case { marker: m, decl, head: m - leading, end: ls.len() })
+        }).collect();
+        // markers that lead to one declaration (`@Test` above `func testX`) are one case
+        cases.dedup_by_key(|c| c.decl);
+        // pass 2: where each body ends. The search stops at the next case's header, which would cut the body there anyway,
+        // so a body that never balances costs its own length and not the rest of the file's.
+        let heads: Vec<usize> = cases.iter().map(|c| c.head).collect();
+        for (i, c) in cases.iter_mut().enumerate() {
+            let limit = heads.get(i + 1).copied().filter(|&next| next > c.decl).unwrap_or(ls.len());
+            let indexed = decls.iter().filter(|&&(lo, hi)| lo >= c.head as i64 + 1 && lo <= c.decl as i64 + 1 && hi >= c.decl as i64 + 1 && hi <= ls.len() as i64)
+                .min_by_key(|&&(lo, hi)| hi - lo).map(|&(_, hi)| hi as usize);
+            c.end = indexed.or_else(|| lang.block_end_of(&ls, c.decl, limit)).unwrap_or_else(|| c.decl + body(&ls, c.decl + 1, limit - c.decl, lang).len()).min(limit);
+        }
+        cases
     }
 
     // (SCAN-02)
@@ -699,11 +869,12 @@ impl Project {
     /// Tagged tests that prove nothing: kind -> [(id, file, line)], in a fixed kind order.
     /// unknown = ID in no spec; retired = struck-through spec; comment-only = every tag of the ID sits in a comment;
     /// disabled = every test is switched off; no-assert = no tagged test body has a direct assertion (it may assert through a helper: verify).
-    pub fn test_problems(&self, s: &IndexMap<String, Spec>, t: &Refs) -> Vec<(&'static str, Vec<(String, String, usize)>)> {
+    pub fn test_problems(&self, s: &IndexMap<String, Spec>, t: &Refs, graph: Option<&Graph>) -> Vec<(&'static str, Vec<(String, String, usize)>)> {
         let gone: std::collections::HashSet<String> = self.retired().into_iter().collect();
-        let mut out: Vec<(&'static str, Vec<(String, String, usize)>)> = ["unknown", "retired", "comment-only", "disabled", "no-assert"].into_iter().map(|k| (k, vec![])).collect();
+        let mut out: Vec<(&'static str, Vec<(String, String, usize)>)> = ["unknown", "retired", "comment-only", "comment-tagged", "disabled", "no-assert"].into_iter().map(|k| (k, vec![])).collect();
         let slot = |out: &mut Vec<(&'static str, Vec<_>)>, k: &str, v| out.iter_mut().find(|(n, _)| *n == k).unwrap().1.push(v);
         let mut ids: Vec<&String> = t.keys().collect();
+        let ranges: std::collections::HashMap<_, _> = self.test_files().iter().map(|f| (f.as_str(), self.test_ranges(f, graph))).collect();
         ids.sort();
         for i in ids {
             let refs = &t[i];
@@ -713,8 +884,13 @@ impl Project {
             } else if !s.contains_key(i) {
                 slot(&mut out, "unknown", first);
             } else {
+                // (SCAN-36) Preserve the actual comment location when an ID has several tags.
+                let cases = |r: &Ref| ranges.get(r.file.as_str()).map_or(&[][..], Vec::as_slice);
+                if let Some(r) = refs.iter().find(|r| self.flag(r, "comment-tagged", cases(r))) {
+                    slot(&mut out, "comment-tagged", (i.clone(), r.file.clone(), r.line));
+                }
                 for kind in ["comment-only", "disabled", "no-assert"] {
-                    if refs.iter().all(|r| self.flag(r, kind)) {
+                    if refs.iter().all(|r| self.flag(r, kind, cases(r))) {
                         slot(&mut out, kind, first.clone());
                     }
                 }
@@ -723,22 +899,27 @@ impl Project {
         out
     }
 
-    fn flag(&self, r: &Ref, kind: &str) -> bool {
+    // (SCAN-35)
+    fn flag(&self, r: &Ref, kind: &str, cases: &[Case]) -> bool {
         let (ls, lang) = (self.lines(&r.file), self.lang(&r.file));
+        let comment = lang.is_comment(&r.text);
+        let start = r.line - 1;
+        let case = cases.iter().copied().filter(|c| c.head <= start && start < c.end).last();
         match kind {
-            "comment-only" => lang.is_comment(&r.text),
+            "comment-only" => comment && case.is_none(),
+            "comment-tagged" => comment && case.is_some(),
             "disabled" => {
-                // the attribute: the tag line up to the declaration line
-                let mut head = vec![];
-                for x in ls.iter().skip(r.line - 1).take(4) {
-                    head.push(x);
-                    if lang.decl.is_match(x) {
-                        break;
-                    }
+                if let Some(c) = case {
+                    ls[c.head..=c.decl].iter().any(|x| lang.off.is_match(x))
+                } else {
+                    !comment && ls.iter().skip(start).take(4).take_while(|x| !lang.decl.is_match(x)).any(|x| lang.off.is_match(x))
                 }
-                !lang.is_comment(&r.text) && head.iter().any(|x| lang.off.is_match(x))
             }
-            _ => !lang.is_comment(&r.text) && !body(&ls, r.line, 200).iter().any(|x| lang.assert.is_match(x)),
+            _ => if let Some(c) = case {
+                !ls[c.decl..c.end].iter().any(|x| lang.assert.is_match(x))
+            } else {
+                !comment && !body(&ls, r.line, 200, lang).iter().any(|x| lang.assert.is_match(x))
+            },
         }
     }
 
@@ -787,14 +968,56 @@ pub fn sorted_ids<'a>(ids: impl IntoIterator<Item = &'a String>) -> Vec<String> 
 }
 
 /// Lines of the function a 1-based tagged line `n` belongs to: from the tag to the brace that closes it.
-pub fn body(ls: &[String], n: usize, cap: usize) -> &[String] {
-    let (start, mut depth, mut opened) = (n - 1, 0i32, false);
+pub fn body<'a>(ls: &'a [String], n: usize, cap: usize, lang: &Lang) -> &'a [String] {
+    // shortcut: language-specific raw strings need a lexer when exact boundaries are required.
+    // `'` opens a string only when it closes on the same line (so an apostrophe in prose cannot swallow the rest), or, in a language
+    // with lifetimes, a char literal. Line comments come from the profile's `comment` markers.
+    let closes = |rest: &str| { let mut it = rest.chars(); while let Some(c) = it.next() { if c == '\\' { it.next(); } else if c == '\'' { return true; } } false };
+    // until the body opens, a brace inside the parameters (`(ctx = {}) =>`, `fn f(P { x }: P)`) is no body; a call marker's own `(` is one level
+    let (start, mut depth, mut opened, mut paren, base) = (n - 1, 0i32, false, 0i32, lang.call as i32);
+    let (mut quote, mut raw, mut triple, mut block_comment) = (None, None::<usize>, false, false);
     let stop = (start + cap).min(ls.len());
     for (k, line) in ls[start.min(stop)..stop].iter().enumerate() {
-        depth += line.matches('{').count() as i32 - line.matches('}').count() as i32;
-        opened = opened || line.contains('{');
-        if depth < 0 || (opened && depth == 0) {
-            return &ls[start..start + k + 1];
+        let mut chars = line.chars();
+        while let Some(c) = chars.next() {
+            let rest = chars.as_str();
+            if block_comment {
+                if c == '*' && rest.starts_with('/') { chars.next(); block_comment = false; }
+            } else if let Some(hashes) = raw {
+                if c == '"' && rest.chars().take(hashes).filter(|c| *c == '#').count() == hashes {
+                    for _ in 0..hashes { chars.next(); }
+                    raw = None;
+                }
+            } else if triple {
+                if c == '"' && rest.starts_with("\"\"") {
+                    chars.next(); chars.next(); triple = false;
+                }
+            } else if let Some(q) = quote {
+                if c == '\\' { chars.next(); } else if c == q { quote = None; }
+            } else if lang.comment.iter().any(|m| line[line.len() - rest.len() - c.len_utf8()..].starts_with(m.as_str())) {
+                break;
+            } else if c == '/' && rest.starts_with('*') {
+                chars.next(); block_comment = true;
+            } else if c == 'r' && rest.trim_start_matches('#').starts_with('"') {
+                let hashes = rest.chars().take_while(|c| *c == '#').count();
+                for _ in 0..=hashes { chars.next(); }
+                raw = Some(hashes);
+            } else if c == '"' && rest.starts_with("\"\"") {
+                chars.next(); chars.next(); triple = true;
+            } else if c == '"' || c == '`' {
+                quote = Some(c);
+            } else if c == '\'' && (rest.starts_with('\\') || rest.chars().nth(1) == Some('\'') || (!lang.lifetimes && closes(rest))) {
+                quote = Some(c);
+            } else if c == '(' {
+                paren += 1;
+            } else if c == ')' {
+                paren -= 1;
+            } else if c == '{' && (opened || paren <= base) {
+                depth += 1; opened = true;
+            } else if c == '}' && (opened || paren <= base) {
+                depth -= 1;
+            }
+            if depth < 0 || (opened && depth == 0) { return &ls[start..start + k + 1]; }
         }
     }
     &ls[start.min(stop)..stop]

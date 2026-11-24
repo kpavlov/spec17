@@ -1,6 +1,7 @@
 class Spec17 < Formula
   desc "CLI, MCP server and web dashboard for spec-driven-development evidence"
   homepage "https://spec17.dev"
+  license :cannot_represent
 
   # Begin stable release
   version "0.2.0"

@@ -1,4 +1,14 @@
 import hljs from "highlight.js/lib/common";
+import xml from "highlight.js/lib/languages/xml";
+
+// (WEB-08) Svelte combines HTML with template expressions and TypeScript or JavaScript blocks.
+hljs.registerLanguage("svelte", (h) => {
+  const language = xml(h);
+  const script = language.contains?.find((mode) => typeof mode !== "string" && String(mode.begin) === String(/<script(?=\s|>)/));
+  if (script && typeof script !== "string" && script.starts) script.starts.subLanguage = "typescript";
+  language.contains?.unshift({ begin: /\{(?=[#/:@A-Za-z_$])/, end: /\}/, subLanguage: "typescript" });
+  return language;
+});
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 

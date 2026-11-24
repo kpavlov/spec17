@@ -1,5 +1,5 @@
 # How a requirement line looks in a spec. To accept a new spec format, edit these patterns; no Rust change.
-# Regexes are TOML literal strings ('...'): write them as-is, no escaping. Use only non-capturing groups (?:...).
+# Regexes are TOML literal strings ('...'): write them as-is, no escaping. Use non-capturing groups (?:...) except for metadata values.
 # Write word boundaries as (?-u:\b): requirement words are ASCII, and a Unicode \b is slow on lines with non-ASCII text.
 #
 #   id           requirement ID rules, tried together (leftmost match wins, so order rules that share a start from long to short)
@@ -7,6 +7,8 @@
 #   level        the level of a bullet or table row, on its first line
 #   block_level  the level of a heading or paragraph block, on any of its lines (EARS `shall` in lower case too)
 #   done         a check mark: a hint that the requirement is done
+#   priority     priority hints, first matching rule wins; capture group 1 is the value
+#   effort       effort hints, first matching rule wins; capture group 1 is the value
 #   line         what opens a one-line requirement before the ID: a bullet (wraps until a blank line) or a table row
 #   block        what opens a block requirement before the ID: a heading (runs to the next heading), an OpenSpec
 #                `### Requirement: ID` heading or a `**ID**` paragraph
@@ -24,6 +26,19 @@ not_id = [
 level = '(?-u:\b)(?:MUST|SHOULD|MAY|SHALL)(?-u:\b)'
 block_level = '(?-u:\b)(?:MUST|SHOULD|MAY|SHALL|shall)(?-u:\b)'
 done = '[✅✔☑✳]\x{FE0F}?'
+priority = [
+    '(?i)(?:^|\s)[\[(]priority:\s*(P[0-9]+)[\])]',
+    # case-sensitive and bracketed: p95 latency, (p95) and P2P are prose, not hints
+    '(?:^|\s)\[(P[0-9]+)\]',
+    '(?:^|\s)\((P[0-9]+)\)',
+]
+effort = [
+    '(?i)(?:^|\s)\((?:effort|size|estimate):\s*([^()\[\]]+?)\s*\)',
+    '(?i)(?:^|\s)\[(?:effort|size|estimate):\s*([^()\[\]]+?)\s*\]',
+    # upper case and after whitespace: requirement(s), file(s) and a code-quoted `[M]` are not sizes
+    '(?:^|\s)\[(XXXS|XXS|XS|S|M|L|XL|XXL|XXXL)\]',
+    '(?:^|\s)\((XXXS|XXS|XS|S|M|L|XL|XXL|XXXL)\)',
+]
 line = ['(?:[-*+]|\d+[.)])\s+', '\|\s*']
 block = ['#{1,6}\s+Requirement:\s*', '#{1,6}\s+', '\*\*']
 removed = '^#{1,2}\s+REMOVED\b'

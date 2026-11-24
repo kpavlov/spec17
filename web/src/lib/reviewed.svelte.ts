@@ -1,4 +1,4 @@
-// (WEB-35) Reviewed flags: {requirement ID: the commit it had when it was reviewed}, one record per repo in IndexedDB.
+// (WEB-35, WEB-52) Reviewed flags: {requirement ID: the commit it had when it was reviewed}, one record per repo in IndexedDB.
 // Where storage is blocked the flags still work, for this session.
 import { db, run } from "$lib/db.svelte";
 

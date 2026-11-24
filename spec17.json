@@ -1,14 +1,10 @@
 {
-  "specs": "specs",
   "tests": ["core/tests", "server/src", "server/tests"],
-  "src": ["core/src", "server/src"],
-  "ext": ["rs"],
+  "src": ["core/src", "server/src", "web/src"],
+  "ext": ["rs", "ts", "svelte", "css"],
   "profiles": [{
-    "name": "rust",
-    "decl": "^\\s*(?:pub(?:\\([^)]*\\))?\\s+)?(?:async\\s+)?(?:fn|struct|enum|trait|impl|type|mod)\\s+([A-Za-z_]\\w*)",
-    "assert": "assert!|assert_eq!|assert_ne!|panic!",
-    "off": "#\\[ignore"
-  }],
-  "retired_prefixes": [],
-  "infra_paths": []
+    "name": "css",
+    "ext": ["css"],
+    "comment": ["/*"]
+  }]
 }

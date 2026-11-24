@@ -13,6 +13,10 @@ Well-known tokens that look like IDs are never requirements: `UTF-8`, `ISO-8601`
 
 A requirement also has a level: `MUST`, `SHOULD`, `MAY` or `SHALL`. Heading and paragraph styles accept the EARS `shall` in lower case too; bullets and table rows do not, and `should` and `may` must always be capitals.
 
+A priority hint is a `P` followed by digits in square brackets or parentheses, such as `[P1]` or `(P2)`, or a labelled `(Priority: P1)`. An effort hint is an upper-case T-shirt size in brackets such as `[M]` or `(XL)`, or a labelled estimate such as `[effort: 3 points]`, `(size: M)` or `[estimate: 2 days]`. A hint must follow whitespace, so `p95 latency`, `requirement(s)`, `P2P` and a code-quoted `` `[M]` `` are not hints. Listings and traces expose both as separate fields, and keep them in the text. Labelled hints take precedence over unlabelled hints; otherwise the order of patterns decides, then the first match of that pattern. Place annotations before an ending `(manual)` or `(later)` marker.
+
+The patterns are `priority` and `effort` in `core/resources/spec_format.toml`. A repo replaces them with `priority` and `effort` in `spec17.json`: ordered regexes whose capture group 1 is the value, for example `"priority": ["\\*\\*(P[0-9]+)\\*\\*"]`. A pattern without a capture group, or one that does not compile, is an error.
+
 ## Requirement styles
 
 spec17 reads several ways of writing a requirement, and one repo can mix them. The styles below are small fixtures in `core/test-data` that the tests load: bullets, tables, Spec Kit, headings and paragraphs are files of the `styles` repo; OpenSpec, Kiro, Superpowers and the fallback each have a repo of their own. Spec folders are detected, so there is nothing to configure.
@@ -133,9 +137,11 @@ An ending `(manual)`, `(later)` or `(deferred)` marks a bullet; `(deferred)` mea
 ## Tests and citations
 
 - A test tag is the ID in square brackets: `[ABC-12]`, or `[ABC-12, ABC-14]` for several. Put it in the test's title, name or doc attribute, for example a Swift `@Test("[REQ_001] underscore tag")`, a Rust `#[doc = "[API-02]"]` above `#[test]`, or a Python docstring. Tags are read in files in test folders or named like tests (`test_*.py`, `*_test.go`, `*.test.ts`).
-- A source citation is an ID in a line comment (`//`, `#`, `///`) of a source file. `// (ABC-12)` is the convention; the parentheses are not required, and block comments are not scanned.
+- A source citation is an ID after a configured comment marker on the same line, such as `// (ABC-12)`; the parentheses are not required. Svelte also recognizes `<!-- (ABC-12) -->`. The scanner does not track multiline comment boundaries.
 
-The report also lists tags it distrusts, under invalid tests: an ID no spec defines (`unknown`) or a struck-out one (`retired`), an ID tagged only in a comment (`comment-only`), only on a disabled test (`disabled`), or only on a test with no direct assertion (`no-assert`). A citation of an ID no spec defines is a dangling citation when a spec uses the same prefix, which catches typos and retired IDs.
+The report also lists tags it distrusts, under invalid tests: an ID no spec defines (`unknown`) or a struck-out one (`retired`), an ID tagged only in comments outside detected tests (`comment-only`), only on a disabled test (`disabled`), or only on a test with no direct assertion (`no-assert`). A citation of an ID no spec defines is a dangling citation when a spec uses the same prefix, which catches typos and retired IDs.
+
+Comments attached to a detected test are listed separately as `comment-tagged`. They are evidence to review and do not count as invalid tests.
 
 ## States
 
@@ -171,6 +177,12 @@ Most repos need none. To override a detected field, put `spec17.json` at the rep
 ```
 
 Each file is read with the profile of its language: comment markers, `decl`, `assert`, `off`, `test` (which paths are tests) and `case` (the line that opens a test case). `profiles` holds entries shaped like a `[[profile]]` of `core/resources/profiles.toml`: `{"name": "rust", "assert": "assert!|panic!"}` changes only that field of the built-in Rust profile, and a new `name` with `ext` and `comment` adds a language. A field a profile does not have is an error, and so are the old top-level `comment`, `decl`, `assert`, `off`, `case` and `test_files`.
+
+`annotation` is a regex for a line that attaches to the declaration below it, as a comment above does (`^\s*@` for Swift and Kotlin, `^\s*#\[` for Rust, `^\s*\[` for C#); a tag in a comment above such a line still belongs to the test. A test marker that sits inside a string literal or a trailing comment opens no case. A profile that sets no `annotation` has none.
+
+A language without braces says how a test body ends in its profile: `block_indent` (Python: the first line no deeper than the declaration); `block_open` and `block_close` (nesting, where each match on a line adds or removes a level and the body ends back at 0, as for Ruby `do`/`end` or Lua `function`/`end`); `block_end` (the first line matching it, as for Visual Basic `End Sub`); `block_fence` (a SQL `$$` or `$tag$` region in which nothing counts). Without any of them a body is closed by its braces. `block_indent` cannot be combined with the others, and `block_open` and `block_close` come as a pair; anything else is an error when the repo is opened. A body is looked for only down to the next test's header, so a miscounted body cannot slow the scan down. These are patterns, not a parser: an unusual keyword position can miscount.
+
+Each regex field accepts a string or an ordered array of strings, such as `"assert": ["assert!", "panic!"]`. For each input, the first matching pattern wins. Every `decl` pattern needs a capture group 1 for the name. Setting an array replaces that field's built-in patterns.
 
 The requirement-line patterns (`core/resources/spec_format.toml`) and the language profiles (`core/resources/profiles.toml`) are compiled into the binary. To support another language, add a `[[profile]]` and rebuild, or put the same entry in `profiles`.
 

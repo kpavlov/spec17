@@ -54,9 +54,11 @@ pub struct Graph {
     pub version: Option<i64>,
 }
 
-const NEEDED: [(&str, &[&str]); 2] = [
+const NEEDED: [(&str, &[&str]); 3] = [
     ("nodes", &["id", "kind", "name", "qualified_name", "file_path", "start_line", "end_line", "visibility"]),
     ("edges", &["source", "target", "kind"]),
+    // (SCAN-35) without the hash, no range can be trusted to match the file
+    ("files", &["path", "content_hash"]),
 ];
 
 impl Graph {
@@ -122,6 +124,18 @@ impl Graph {
     pub fn decls_in(&self, file: &str) -> R<Vec<(i64, i64, String)>> {
         let mut st = self.c.prepare(&format!("select start_line, end_line, qualified_name from nodes where file_path=?1 and kind in ({DECL_KINDS})"))?;
         Ok(st.query_map([file], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))?.collect::<Result<_, _>>()?)
+    }
+
+    /// (SCAN-35) The SHA-256 (hex) of the file as the index last read it; None when the file is not indexed.
+    pub fn indexed_hash(&self, file: &str) -> R<Option<String>> {
+        let mut st = self.c.prepare("select content_hash from files where path=?1")?;
+        Ok(st.query_map([file], |r| r.get(0))?.next().transpose()?)
+    }
+
+    /// (SCAN-35) Function and method ranges in one test file.
+    pub fn test_decls_in(&self, file: &str) -> R<Vec<(i64, i64)>> {
+        let mut st = self.c.prepare("select start_line, end_line from nodes where file_path=?1 and kind in ('function','method')")?;
+        Ok(st.query_map([file], |r| Ok((r.get(0)?, r.get(1)?)))?.collect::<Result<_, _>>()?)
     }
 
     /// Every node under `prefix`, in index order.

@@ -8,6 +8,7 @@ edition = "2024"
 authors = ["Konstantin Pavlov"]
 repository = "https://github.com/kpavlov/spec17"
 homepage = "https://spec17.dev"
+license-file = "LICENSE"
 keywords = ["spec-driven", "requirements", "traceability", "mcp", "cli"]
 categories = ["development-tools", "command-line-utilities"]
 

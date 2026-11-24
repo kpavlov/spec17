@@ -2,6 +2,7 @@
 # To support a new language, append a [[profile]] table; nothing else needs to change.
 # A repo can do the same without a rebuild: `profiles` in spec17.json takes entries of this shape (JSON), and one named
 # like a profile here changes only the fields it sets.
+# Regex fields accept a string or an ordered list; the first pattern matching each input wins.
 # Regexes are TOML literal strings ('...'): write them as-is, no escaping (use \x27 for a single quote).
 #
 #   name     ecosystem name (shown in the UI)
@@ -14,27 +15,39 @@
 #   inline   tests live in the source files too (Rust `mod tests`); default false
 #   case     a line that opens a test case (an attribute, annotation, call or declaration)
 #   call     `case` matches a call such as it("name", ...), so the name is its quoted string; default false
+#   lifetimes  a `'` may open a lifetime (Rust `'a`), so only `'x'` and `'\n'` are char literals; default false: `'...'` is a string
+#   annotation  a line that attaches to the declaration below it (`@Test`, `#[test]`, `[Fact]`, `<Test>`), as a comment above does; default none
+#   block_*  how a test body ends when the language has no braces (none set: braces):
+#              block_indent  at the first line no deeper than the declaration (Python); default false
+#              block_open / block_close  nesting: each match on a line, strings and comments left out, adds or removes a level;
+#                        the body ends when the level is back to 0
+#              block_end  the first line matching it ends the body
+#              block_fence  a match opens a quoted region (SQL `$tag$`) where nothing counts; the same text closes it and ends the body
 
 [[profile]]
 name = "swift"
 ext = ["swift"]
 comment = ["//"]
-decl = '^\s*(?:(?:public|internal|private|fileprivate|final|nonisolated|indirect|static)\s+)*(?:struct|class|enum|actor|protocol|extension|func|typealias)\s+([A-Za-z_]\w*)'
+decl = '^\s*(?:@\w+(?:\([^)]*\))?\s+)*(?:(?:public|internal|private|fileprivate|final|nonisolated|indirect|static)\s+)*(?:struct|class|enum|actor|protocol|extension|func|typealias)\s+(`[^`]+`|[A-Za-z_]\w*)'
 assert = '#expect|#require|XCTAssert|XCTFail|XCTUnwrap|Issue\.record|confirmation\('
 off = '\.disabled\(|\.enabled\(if: false|XCTSkip'
 test = '(^|/)[^/]*Tests?(/|\.swift$)'
-case = '^\s*@Test\b|^\s*(?:@\w+\s+)*func\s+test\w*'
+case = '^\s*(?:(?:@\w+(?:\([^)]*\))?\s+)*@Test\b|(?:@\w+(?:\([^)]*\))?\s+)*func\s+(?:test\w*|`test[^`]*`))'
+annotation = '^\s*@'
 
 [[profile]]
 name = "rust"
 ext = ["rs"]
 comment = ["//"]
 decl = '^\s*(?:pub(?:\([^)]*\))?\s+)?(?:async\s+)?(?:fn|struct|enum|trait|impl|type|mod)\s+([A-Za-z_]\w*)'
-assert = 'assert!|assert_eq!|assert_ne!|panic!|matches!'
+# (SCAN-07) matches! returns a boolean; it does not assert it.
+assert = 'assert!|assert_eq!|assert_ne!|panic!'
 off = '#\[ignore'
 test = '(^|/)(tests|benches)/|_test\.rs$'
 inline = true
+lifetimes = true
 case = '#\[(?:\w+::)*(?:test|rstest|test_case)\b'
+annotation = '^\s*#\['
 
 [[profile]]
 name = "typescript"
@@ -44,6 +57,19 @@ decl = '^\s*(?:export\s+)?(?:default\s+)?(?:declare\s+)?(?:async\s+)?(?:abstract
 assert = 'expect\(|assert[.(]|\.should\b|\bexpect\.'
 off = '\.skip\(|\bxit\(|\bxdescribe\(|\.todo\('
 test = '(^|/)(__tests__|tests?|e2e|cypress)/|\.(test|spec)\.[cm]?[jt]sx?$'
+case = '^\s*(?:it|test)(?:\.\w+)*\s*\('
+annotation = '^\s*@'
+call = true
+
+[[profile]]
+# (SCAN-39)
+name = "svelte"
+ext = ["svelte"]
+comment = ["//", "<!--"]
+decl = '^\s*(?:export\s+)?(?:async\s+)?(?:function\*?|class|interface|type|const)\s+([A-Za-z_$][\w$]*)'
+assert = 'expect\(|assert[.(]|\.should\b|\bexpect\.'
+off = '\.skip\(|\bxit\(|\bxdescribe\(|\.todo\('
+test = '(^|/)(__tests__|tests?|e2e|cypress)/|\.(test|spec)\.svelte$'
 case = '^\s*(?:it|test)(?:\.\w+)*\s*\('
 call = true
 
@@ -56,6 +82,8 @@ assert = '\bassert\b|pytest\.raises|self\.assert|\.assert_'
 off = '@pytest\.mark\.skip|@unittest\.skip|pytest\.skip|pytest\.xfail'
 test = '(^|/)(tests?|testing)/|(^|/)test_[^/]*\.py$|_test\.py$|(^|/)conftest\.py$'
 case = '^\s*(?:async\s+)?def\s+test\w*'
+annotation = '^\s*@'
+block_indent = true
 
 [[profile]]
 name = "go"
@@ -76,6 +104,7 @@ assert = '\bassert\w*\(|assertThat|verify\(|\bexpect\w*\(|\bshould'
 off = '@Disabled|@Ignore|@Ignored'
 test = '(^|/)src/[A-Za-z]*[tT]ests?[A-Za-z]*/|(^|/)tests?/|(Tests?|IT|Spec)\.(java|kt|scala)$'
 case = '^\s*@(?:\w+\.)*(?:Test|ParameterizedTest|RepeatedTest|TestFactory)\b'
+annotation = '^\s*@'
 
 [[profile]]
 name = "csharp"
@@ -86,6 +115,7 @@ assert = 'Assert\.|\.Should\(|Expect\('
 off = 'Skip\s*=|\[Ignore'
 test = '(^|/)[^/]*(Tests?|Specs?)(/|\.cs$)|(^|/)tests?/'
 case = '^\s*\[(?:Test|TestMethod|Fact|Theory|TestCase)\b'
+annotation = '^\s*\['
 
 [[profile]]
 name = "ruby"
@@ -97,6 +127,10 @@ off = '\bskip\b|\bxit\b|\bxdescribe\b|\bpending\b'
 test = '(^|/)(spec|test)/|_(spec|test)\.rb$'
 case = '^\s*(?:(?:it|specify|scenario)\s*[(\x22\x27]|def\s+test_)'
 call = true
+# a statement keyword opens a level at the start of a line; `if`, `unless`, `case`, `begin` also after `=`, `(`, `&&`, `||`
+# (`x = case y`), never as a modifier (`x = 1 if y`) or a keyword argument (`if:`); `do` anywhere, once per `while ... do`
+block_open = '^\s*(?:(?:while|until|for)\b(?:.*?\bdo\b)?|(?:def|class|module)\b)|(?:^|[=(]|&&|\|\|)\s*(?:if|unless|case|begin)(?:[^\w:]|$)|\bdo\b'
+block_close = '\bend\b'
 
 [[profile]]
 name = "php"
@@ -107,6 +141,7 @@ assert = '\$this->assert|\bassert\w*\(|\bexpect\('
 off = 'markTestSkipped|markTestIncomplete'
 test = '(^|/)tests?/|Tests?\.php$'
 case = '^\s*(?:public\s+)?function\s+test\w*|^\s*#\[Test\]|@test\b'
+annotation = '^\s*#\['
 
 [[profile]]
 name = "c/c++"
@@ -128,6 +163,7 @@ assert = 'expect\(|\bassert\(|verify\(|\bexpectLater\('
 off = 'skip:|@Skip'
 test = '(^|/)test/|_test\.dart$'
 case = '^\s*(?:test|testWidgets|blocTest|testGoldens)\s*(?:<[^>]*>)?\s*\('
+annotation = '^\s*@'
 call = true
 
 [[profile]]
@@ -140,6 +176,9 @@ off = '\bpending\(|\bxit\(|\bxdescribe\('
 test = '(^|/)(tests?|spec)/|_(spec|test)\.luau?$'
 case = '^\s*(?:it|test)\s*\('
 call = true
+# `elseif` is not matched by `\bif\b`; `while ... do` and `for ... do` open at their `do`
+block_open = '\b(?:function|do|if|repeat)\b'
+block_close = '\b(?:end|until)\b'
 
 [[profile]]
 name = "r"
@@ -181,6 +220,8 @@ assert = '\?_?assert\w*\(|\?_?assertEqual\('
 off = '\{skip,|\?_?skip'
 test = '(^|/)test/|_(tests|SUITE)\.erl$'
 case = '^\w+_test_?\s*\('
+# a function clause ends with a `.` that is not in a comment
+block_end = '^\s*(?:[^%\s].*)?\.\s*$'
 
 [[profile]]
 name = "vb.net"
@@ -191,6 +232,8 @@ assert = 'Assert\.|\.Should\('
 off = 'Skip\s*:?=|<Ignore'
 test = '(^|/)[^/]*(Tests?|Specs?)(/|\.vb$)|(^|/)tests?/'
 case = '(?i)^\s*<(?:Test|TestMethod|Fact|Theory|TestCase)\b'
+annotation = '^\s*<'
+block_end = '(?i)^\s*end\s+(?:sub|function)\b'
 
 [[profile]]
 name = "pascal"
@@ -201,6 +244,9 @@ assert = 'Check\w*\(|Assert\w*\('
 off = '\[Ignore'
 test = '(^|/)tests?/|Tests?\.(pas|dpr)$'
 case = '(?i)^\s*\[Test\b|^\s*procedure\s+(?:\w+\.)?Test\w*'
+annotation = '^\s*\['
+block_open = '(?i)\b(?:begin|case|try|record)\b'
+block_close = '(?i)\bend\b'
 
 [[profile]]
 name = "sql"
@@ -211,3 +257,8 @@ assert = '(?i)\b(?:ok|is|isnt|matches|results_eq|set_eq|bag_eq|throws_ok|lives_o
 off = '(?i)\b(?:skip|todo)\s*\('
 test = '(^|/)(tests?|spec)/[^/]*\.sql$|_test\.sql$'
 case = '(?i)^\s*create\s+(?:or\s+replace\s+)?(?:function|procedure|proc)\s+[\w."\[\]]*test'
+block_open = '(?i)\b(?:begin|case)\b'
+block_close = '(?i)\bend\b'
+block_end = '(?i)^\s*go\s*$'
+# a `$$` or `$tag$` body (PL/pgSQL): nothing inside counts, the same fence ends it
+block_fence = '\$(?:[A-Za-z_]\w*)?\$'

@@ -1,11 +1,12 @@
 {
   "name": "spec17-web",
   "private": true,
+  "license": "SEE LICENSE IN ../LICENSE",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "check": "svelte-check-native"
+    "check": "svelte-check-native && node --test test/*.test.mjs"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "^2.4.0",

@@ -17,6 +17,10 @@ pub struct Config {
     /// sets, any other adds an ecosystem (its comment markers, declaration, assertion and switched-off regexes).
     pub profiles: Vec<Map<String, Value>>,
     pub retired_prefixes: Vec<String>,
+    /// Priority and effort hints in requirement text: ordered regexes, capture group 1 is the value, the first match wins.
+    /// Empty = the built-in patterns of `resources/spec_format.toml`; a list replaces them.
+    pub priority: Vec<String>,
+    pub effort: Vec<String>,
     /// CodeGraph index; empty = `DEFAULT_DB`.
     pub codegraph: String,
     /// Path prefixes under `src[0]` that `uncovered` treats as plumbing.

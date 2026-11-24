@@ -5,4 +5,4 @@
   let { n = 1 }: { n?: number } = $props();
 </script>
 
-<Seg label="View" hint="Show the item as it is, or what changed against HEAD" options={[{ key: "actual", label: "actual" }, { key: "diff", label: n > 1 ? `diff · ${n} files` : "diff" }]} value={preview.view} onpick={setView} />
+<Seg label="View" nowrap hint="Show the item as it is, or what changed against HEAD" options={[{ key: "actual", label: "actual" }, { key: "diff", label: n > 1 ? `diff · ${n} files` : "diff" }]} value={preview.view} onpick={setView} />

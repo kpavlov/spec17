@@ -148,12 +148,15 @@ python3 bench/bench.py --help
 - The first revision listed is the baseline. The table has median, min and stdev in ms, the change of the median against the baseline, and a hash of each command's output; the run says whether the output is the same for every revision. A speed-up must not change the output.
 - Stdlib Python only.
 
-Results at `0eb1fbd` (0.1.0), scale 4 (8,000 requirements, 1,600 source files, 400 test files, 400 docs), 10 runs, wall time per command in ms; one macOS machine, so the absolute times only mean something on that machine:
+Latest result of `make bench REVS="." SCALE=4 RUNS=10`: scale 4 (8,000 requirements, 1,600 source files, 400 test files, 400 docs), wall time per command in ms, one macOS machine, so the absolute times only mean something on that machine.
 
 | command | median | min | stdev |
 |---|--:|--:|--:|
-| `report` | 116.7 | 116.1 | 1.8 |
-| `status --all` | 142.3 | 140.8 | 1.0 |
-| `trace GEN-0001` | 122.0 | 121.6 | 0.5 |
+| `report` | 121.3 | 118.9 | 3.0 |
+| `status --all` | 148.1 | 145.5 | 2.4 |
+| `trace GEN-0001` | 123.1 | 121.7 | 1.7 |
+
+- Runs differ by a few percent from one session to the next on the same machine (the stdev column shows the spread within one), so read differences under about 3% as noise.
+- The generated repo does not cover a test whose nesting never balances (a Ruby `unless` without its `end`). Measured separately on a generated Ruby file of 800 tests: searching each body to the end of the file took 130 ms; searching only down to the next test's header takes 15 ms, the same as 800 balanced tests.
 
 The 1-second change poll behind `resources/updated` is not covered: the CLI does not expose it.

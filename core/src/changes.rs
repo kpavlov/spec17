@@ -316,6 +316,8 @@ pub struct ReqChange {
     pub state: String,
     pub level: String,
     pub text: String,
+    pub priority: Option<String>,
+    pub effort: Option<String>,
     pub file: String,
     pub line: usize,
     /// How it is touched: spec, test, src.
@@ -591,13 +593,13 @@ impl Analysis {
             let notes = mine.iter().filter(|n| seen.insert((n.role, n.action, &n.file))).map(|n| ReqNote { role: n.role.into(), action: n.action.into(), file: n.file.clone() }).collect();
             let changed = roles_of(mine.iter().copied(), id);
             if self.s.contains_key(id) {
-                let Row { state, level, text, file, line, .. } = self.requirement_row(id);
-                return ReqChange { id: id.into(), deleted: false, state, level, text, file, line, changed, notes };
+                let Row { state, level, text, priority, effort, file, line, .. } = self.requirement_row(id);
+                return ReqChange { id: id.into(), deleted: false, state, level, text, priority, effort, file, line, changed, notes };
             }
             let gone = mine.iter().find(|n| n.role == "spec" && n.action == "removed");
             ReqChange {
                 id: id.into(), deleted: gone.is_some(), state: if gone.is_some() { "deleted" } else { "unknown" }.into(), level: String::new(),
-                text: gone.and_then(|n| n.text.as_deref()).map(|t| self.bullet_text(t)).unwrap_or_default(), file: gone.map(|n| n.file.clone()).unwrap_or_default(), line: 0, changed, notes,
+                text: gone.and_then(|n| n.text.as_deref()).map(|t| self.bullet_text(t)).unwrap_or_default(), priority: None, effort: None, file: gone.map(|n| n.file.clone()).unwrap_or_default(), line: 0, changed, notes,
             }
         }).collect();
         let files = files.into_iter().filter_map(|f| {

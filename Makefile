@@ -16,7 +16,7 @@ TAG ?= v$(VERSION)
 SIGN_IDENTITY ?= -
 archive = dist/spec17-$(1)-$(OS)-$(ARCH).tar.gz
 
-.PHONY: help dev serve web build release-build run install uninstall dist sign check-tag upload release-dev upload-edge report test parity bench docs screenshots site upgrade clean mcp-inspector
+.PHONY: help dev serve web build release-build run install uninstall dist sign check-tag upload release-dev upload-edge notices report test parity bench docs screenshots site upgrade clean mcp-inspector
 
 help:
 	@echo "make dev      Vite (HMR, :5173) + Rust server on :$(PORT) proxying to it, scanning $(ROOT)"
@@ -27,6 +27,7 @@ help:
 	@echo "make dist      dist/spec17-$(VERSION)-$(OS)-$(ARCH).tar.gz (+ .sha256) for this machine (macOS or Linux); signed on macOS"
 	@echo "make sign      macOS: codesign the release binary (SIGN_IDENTITY, default ad hoc)"
 	@echo "make upload    add this machine's archive to the prerelease TAG (default v$(VERSION), must be pushed and checked out); creates it if missing"
+	@echo "make notices   regenerate NOTICES; run after dependency changes"
 	@echo "make release-dev  upload an Apple Silicon build from origin/main and write Formula/spec17-dev.rb"
 	@echo "make report   print the text report for $(ROOT)"
 	@echo "make test     cargo tests; make parity compares with the old Python scripts if vendored in $(ROOT)"
@@ -81,7 +82,7 @@ release-build:
 
 dist: $(if $(filter darwin,$(OS)),sign,release-build)
 	@mkdir -p dist
-	tar -czf $(call archive,$(LABEL)) -C target/release spec17
+	tar -czf $(call archive,$(LABEL)) -C target/release spec17 -C "$(CURDIR)" LICENSE NOTICES
 	@cd dist && f=$(notdir $(call archive,$(LABEL))) && { sha256sum $$f 2>/dev/null || shasum -a 256 $$f; } > $$f.sha256
 	@ls -la $(call archive,$(LABEL))*
 
@@ -136,13 +137,16 @@ release-dev:
 	fi; \
 	printf '%s\n' 'class Spec17Dev < Formula' \
 	  '  desc "Prebuilt development version of spec17 for Apple Silicon"' \
-	  '  homepage "https://spec17.dev"' \
+	  '  homepage "https://spec17.dev"' '  license :cannot_represent' \
 	  "  $$url" '  version "$(DEV_VERSION)"' "  sha256 \"$$sha\"" '' \
 	  '  depends_on :macos' '  depends_on arch: :arm64' \
 	  '  conflicts_with "spec17", because: "both install a spec17 binary"' '' \
 	  '  def install' '    bin.install "spec17"' '  end' '' \
 	  '  test do' '    system "#{bin}/spec17", "--version"' '  end' 'end' > Formula/spec17-dev.rb; \
 	echo "Commit and push Formula/spec17-dev.rb to publish spec17-dev."
+
+notices: web/node_modules ## regenerate NOTICES (licences of the crates and npm packages in the binary)
+	node scripts/notices.mjs
 
 report:
 	cargo run -q -p spec17 -- --root "$(ROOT)" report

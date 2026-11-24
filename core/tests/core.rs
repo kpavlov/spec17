@@ -32,6 +32,7 @@ fn fixture(name: &str) -> PathBuf {
 @Test(\"[DEM\x2D01] works\") func a() {
     #expect(true)
 }
+
 @Test(\"[DEM\x2D05] built already\") func b() {
     let x = 1
 }
@@ -51,6 +52,73 @@ struct Demo {
 // DEM-98 typo
 ");
     d
+}
+
+#[doc = "[SCAN-40]"]
+#[test]
+fn priority_and_effort_metadata() {
+    let d = fixture("metadata");
+    write(&d, "specs/01-demo.md", "\
+- **DEM-01** MUST — [P12] first (effort: XL) (manual)\n\
+- **DEM-02** SHOULD — [P2] second [M].\n\
+- **DEM-03** MAY — no priority; XP1 and P2x are not hints. [estimate: 3 days]\n\
+- **DEM-04** MUST — (Priority: P1) (size: XL).\n\
+- **DEM-05** MUST — [P3] (S).\n\
+- **DEM-06** MUST — [effort: 5 points] and (L).\n\
+- **DEM-07** MUST — (effort: invalid] [unknown] and ordinary text.\n\
+- **DEM-08** MUST — P3 [M] (Priority: P1) (effort: 5 points).\n\
+- **DEM-09** MUST — (effort:   ) [M].\n\
+- **DEM-10** MUST — (effort:  ) (effort: XL).\n\
+- **DEM-11** MUST — p95 latency under 200 ms; P95 and (p95) too.\n\
+- **DEM-12** MUST — list the requirement(s) and file(s) [s] (m).\n\
+- **DEM-13** MUST — speak HTTP/2 and P2P (P2P) [P2x].\n\
+- **DEM-14** MUST — a hint in code: `[P1]` `(effort: M)` `[M]`.\n\
+- **DEM-15** MUST — call f(P1) and x[M].\n\
+- **DEM-16** SHOULD — fit the layout. [P2] [M] (manual)\n\
+- **DEM-17** MUST — mismatched [P2) (M] brackets.\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let one = &a.s["DEM-01"];
+    assert_eq!((one.priority.as_deref(), one.effort.as_deref(), one.mark.as_str()), (Some("P12"), Some("XL"), "manual"));
+    assert_eq!(a.s["DEM-02"].priority.as_deref(), Some("P2"));
+    assert_eq!(a.s["DEM-02"].effort.as_deref(), Some("M"));
+    assert_eq!(a.s["DEM-03"].priority, None);
+    assert_eq!(a.s["DEM-03"].effort.as_deref(), Some("3 days"));
+    assert_eq!((a.s["DEM-04"].priority.as_deref(), a.s["DEM-04"].effort.as_deref()), (Some("P1"), Some("XL")));
+    assert_eq!(a.s["DEM-05"].effort.as_deref(), Some("S"));
+    assert_eq!(a.s["DEM-06"].effort.as_deref(), Some("5 points"));
+    assert_eq!(a.s["DEM-07"].effort, None);
+    assert_eq!((a.s["DEM-08"].priority.as_deref(), a.s["DEM-08"].effort.as_deref()), (Some("P1"), Some("5 points")));
+    assert_eq!(a.s["DEM-09"].effort.as_deref(), Some("M"));
+    assert_eq!(a.s["DEM-10"].effort.as_deref(), Some("XL"));
+    for id in ["DEM-11", "DEM-12", "DEM-13", "DEM-14", "DEM-15", "DEM-17"] {
+        assert_eq!((a.s[id].priority.as_deref(), a.s[id].effort.as_deref()), (None, None), "{id}");
+    }
+    let last = &a.s["DEM-16"];
+    assert_eq!((last.priority.as_deref(), last.effort.as_deref(), last.mark.as_str()), (Some("P2"), Some("M"), "manual"));
+    let rows = a.status(&StatusOpts { all: true, ..Default::default() }).unwrap();
+    let json = serde_json::to_value(&rows).unwrap();
+    let row = json["rows"].as_array().unwrap().iter().find(|r| r["id"] == "DEM-01").unwrap();
+    assert_eq!(row["priority"], "P12");
+    assert_eq!(row["effort"], "XL");
+    let trace = serde_json::to_value(a.trace("DEM-01").unwrap()).unwrap();
+    assert_eq!(trace["spec"]["priority"], "P12");
+    assert_eq!(trace["spec"]["effort"], "XL");
+}
+#[doc = "[SCAN-40]"]
+#[test]
+fn hint_patterns_come_from_spec17_json() {
+    let d = fixture("hints_custom");
+    write(&d, "spec17.json", r#"{"priority": ["\\*\\*(P[0-9]+)\\*\\*"]}"#);
+    write(&d, "specs/01-demo.md", "- **DEM-01** MUST — **P1** first [P2] [M].\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert_eq!((a.s["DEM-01"].priority.as_deref(), a.s["DEM-01"].effort.as_deref()), (Some("P1"), Some("M")));
+    for (name, patterns, expected) in [("hints_bad_regex", r#"["("]"#, "bad regex"), ("hints_no_group", r#"["P1"]"#, "capture group 1")] {
+        let d = fixture(name);
+        write(&d, "spec17.json", &format!(r#"{{"effort": {patterns}}}"#));
+        write(&d, "specs/01-demo.md", "- **DEM-01** MUST — first.\n");
+        let err = Analysis::load(Some(&d)).err().expect(name);
+        assert!(err.contains(expected), "{name}: {err}");
+    }
 }
 
 #[doc = "[SCAN-01, SCAN-02, SCAN-03, SCAN-04]"]
@@ -146,6 +214,17 @@ fn status_listing_and_trace() {
     assert!(a.trace("ZZZ-1").is_none());
 }
 
+#[doc = "[WEB-47]"]
+#[test]
+fn requirement_rows_include_defined_references() {
+    let d = std::env::temp_dir().join(format!("spec17-{}-requirement-references", std::process::id()));
+    write(&d, "specs/01-demo.md", "- **DEM-01** MUST — see DEM-02, DEM-02, DEM-01 and DEM-99.\n- **DEM-02** MUST — another requirement.\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let rows = a.status(&StatusOpts { all: true, ..Default::default() }).unwrap().rows;
+    assert_eq!(rows.iter().find(|r| r.id == "DEM-01").unwrap().references, ["DEM-01", "DEM-02"]);
+    assert!(rows.iter().find(|r| r.id == "DEM-02").unwrap().references.is_empty());
+}
+
 #[doc = "[SCAN-29]"]
 #[test]
 fn a_citation_above_a_doc_comment_belongs_to_the_declaration_below() {
@@ -194,11 +273,299 @@ fn each_file_reads_with_its_own_profile() {
     let a = Analysis::load(Some(&d)).unwrap();
     let r = a.report();
     let bad = |k: &str| r.invalid_tests[k].iter().map(|p| p.id.as_str()).collect::<Vec<_>>();
-    assert_eq!(bad("comment-only"), ["DEM-02"]); // a Rust attribute is not a Python comment; a `#` line in Python is
+    assert!(bad("comment-only").is_empty()); // the Python comment is attached to the test
     assert!(bad("no-assert").is_empty()); // a Python `assert` counts in a .py file
     let mut decls: Vec<String> = a.trace("DEM-04").unwrap().source_cites.iter().map(|c| c.decl.clone()).collect();
     decls.sort();
     assert_eq!(decls, ["f", "g"]);
+}
+
+#[doc = "[SCAN-39]"]
+#[test]
+fn svelte_citations_work_without_project_configuration() {
+    let d = scratch("svelte-profile");
+    write(&d, "specs/01-demo.md", "- **DEM-01** MUST — a.\n- **DEM-02** MUST — b.\n");
+    write(&d, "src/App.svelte", "<script>\n// (DEM\x2D01)\nconst value = 1;\n</script>\n<!-- (DEM\x2D02) -->\n<p>{value}</p>\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    for id in ["DEM-01", "DEM-02"] {
+        assert_eq!(a.trace(id).unwrap().source_cites[0].r.file, "src/App.svelte");
+    }
+}
+
+#[doc = "[SCAN-07]"]
+#[test]
+fn rust_matches_alone_is_not_an_assertion() {
+    let d = scratch("rust-matches");
+    write(&d, "SPEC.md", "- **DEM-01** MUST — a.\n- **DEM-02** MUST — b.\n");
+    write(&d, "tests/example.rs", "#[doc = \"[DEM\x2D01]\"]\n#[test]\nfn a() { matches!(1, 1); }\n#[doc = \"[DEM\x2D02]\"]\n#[test]\nfn b() { assert!(matches!(1, 1)); }\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert_eq!(a.report().invalid_tests["no-assert"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-01"]);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn attached_comment_tags_are_assessed_with_the_test() {
+    let d = scratch("comment-tags");
+    write(&d, "spec17.json", r#"{"tests":["Tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n- DEM-03 MUST — c.\n");
+    write(&d, "Tests/ExampleTests.swift", "// [DEM\x2D01, DEM\x2D02]\n@MainActor\nfunc testExample() {\n    XCTAssertTrue(true)\n}\n\n// [DEM\x2D03]\n\nfunc testOther() {}\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let r = a.report();
+    assert_eq!(r.invalid_tests["comment-only"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-03"]);
+    assert!(r.invalid_tests["no-assert"].is_empty());
+    assert_eq!(a.tests_view().modules[0].files[0].tests[0].ids, ["DEM-01", "DEM-02"]);
+    let schema = serde_json::to_value(schemars::schema_for!(spec17_core::modules::TestCase)).unwrap();
+    assert!(!schema["required"].as_array().unwrap().iter().any(|field| field == "qualified"));
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn comment_tags_use_their_own_test_for_disabled_and_assertion_checks() {
+    let d = scratch("python-comment-tags");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["py"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — disabled.\n- DEM-02 MUST — no assertion.\n- DEM-03 MUST — orphan.\n");
+    write(&d, "tests/test_example.py", "@pytest.mark.skip\n# [DEM\x2D01]\ndef test_skipped():\n    assert True\n\n# [DEM\x2D02]\ndef test_without_assertion():\n    pass\n\n# [DEM\x2D03]\n\nvalue = 1\n\ndef test_other():\n    assert True\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let report = a.report();
+    let ids = |kind: &str| report.invalid_tests[kind].iter().map(|p| p.id.as_str()).collect::<Vec<_>>();
+    assert_eq!(ids("disabled"), ["DEM-01"]);
+    assert_eq!(ids("no-assert"), ["DEM-02"]);
+    assert_eq!(ids("comment-only"), ["DEM-03"]);
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!(cases[0].ids, ["DEM-01"]);
+    assert_eq!(cases[1].ids, ["DEM-02"]);
+    assert!(cases[2].ids.is_empty());
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn comment_tag_inside_a_test_belongs_to_that_test() {
+    let d = scratch("body-comment-tag");
+    write(&d, "spec17.json", r#"{"tests":["Tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "Tests/ExampleTests.swift", "func testExample() {\n    // [DEM\x2D01]\n    XCTAssertTrue(true)\n}\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let report = a.report();
+    assert!(report.invalid_tests["comment-only"].is_empty());
+    assert!(report.invalid_tests["no-assert"].is_empty());
+    assert_eq!(a.tests_view().modules[0].files[0].tests[0].ids, ["DEM-01"]);
+}
+
+#[doc = "[SCAN-36]"]
+#[test]
+fn report_distinguishes_attached_and_orphan_comment_tags() {
+    let d = scratch("comment-tag-state");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["py"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
+    write(&d, "tests/test_a.py", "# [DEM\x2D01]\ndef test_a():\n    assert True\n\n# [DEM\x2D02]\n\nvalue = 1\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let r = a.report();
+    assert_eq!(r.comment_tagged.iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-01"]);
+    assert_eq!(r.invalid_tests["comment-only"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-02"]);
+    assert!(r.text(&a, 12).contains("comment-tagged"));
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn non_brace_test_bodies_end_before_following_code() {
+    for (ext, first, second) in [
+        ("rb", "it 'first' do\n  # [DEM\x2D01]\nend\n", "it 'second' do\n  # [DEM\x2D02]\n  expect(true)\nend\n"),
+        ("lua", "it('first', function()\n  -- [DEM\x2D01]\nend)\n", "it('second', function()\n  -- [DEM\x2D02]\n  assert(true)\nend)\n"),
+        ("vb", "<Test>\nSub first()\n  ' [DEM\x2D01]\nEnd Sub\n", "<Test>\nSub second()\n  ' [DEM\x2D02]\n  Assert.IsTrue(True)\nEnd Sub\n"),
+        ("pas", "procedure TestFirst;\nbegin\n  // [DEM\x2D01]\nend;\n", "procedure TestSecond;\nbegin\n  // [DEM\x2D02]\n  AssertTrue(true);\nend;\n"),
+        ("erl", "first_test() ->\n  % [DEM\x2D01]\n  ok.\n", "second_test() ->\n  % [DEM\x2D02]\n  ?assert(true).\n"),
+        ("py", "def test_first():\n  # [DEM\x2D01]\n  x = 1\n", "def test_second():\n  # [DEM\x2D02]\n  assert True\n"),
+        ("sql", "CREATE FUNCTION test_first() RETURNS void AS $$\n  -- [DEM\x2D01]\n  SELECT 1;\n$$ LANGUAGE SQL;\n","CREATE FUNCTION test_second() RETURNS void AS $$\n  -- [DEM\x2D02]\n  SELECT ok(true);\n$$ LANGUAGE SQL;\n"),
+    ] {
+        let d = scratch(&format!("body-{ext}"));
+        write(&d, "spec17.json", &format!(r#"{{"tests":["tests"],"ext":["{ext}"]}}"#));
+        write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
+        write(&d, &format!("tests/test_example.{ext}"), &format!("{first}\n{second}"));
+        let a = Analysis::load(Some(&d)).unwrap();
+        let cases = &a.tests_view().modules[0].files[0].tests;
+        assert_eq!(cases.len(), 2, "{ext}");
+        assert_eq!(cases[0].ids, ["DEM-01"], "{ext}");
+        assert_eq!(cases[1].ids, ["DEM-02"], "{ext}");
+        assert_eq!(a.report().invalid_tests["no-assert"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-01"], "{ext}");
+    }
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn spec17_json_describes_how_a_body_ends_without_braces() {
+    let d = scratch("block-profile");
+    write(&d, "spec17.json", r##"{"tests":["tests"],"ext":["toy"],"profiles":[{"name":"toy","ext":["toy"],"comment":["#"],"decl":"^\\s*test\\s+(\\w+)","assert":"check","off":"skip!",
+        "test":"(^|/)tests/","case":"\\btest\\s","annotation":"^\\s*~","block_open":"\\bdo\\b","block_close":"\\bdone\\b"}]}"##);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n- DEM-03 MUST — c.\n");
+    // `test q` in a string and `test r` in a trailing comment are no cases; the `~slow` annotation carries the tag above it to `test c`
+    write(&d, "tests/a.toy", "test a do\n  if x do # [DEM\x2D01]\n  done\n  say \"test q do done\"\ndone\n\ntest b do\n  # [DEM\x2D02]\n  check # test r do\ndone\n\n# [DEM\x2D03]\n~slow\ntest c do\n  check\ndone\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!(cases.len(), 3);
+    assert_eq!((cases[0].ids.clone(), cases[1].ids.clone(), cases[2].ids.clone()), (vec!["DEM-01".to_string()], vec!["DEM-02".to_string()], vec!["DEM-03".to_string()]));
+    assert_eq!(a.report().invalid_tests["no-assert"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-01"]);
+    // a pattern that does not compile is an error when the repo is opened
+    write(&d, "spec17.json", r#"{"profiles":[{"name":"toy","ext":["toy"],"block_open":"(","block_close":"x"}]}"#);
+    assert!(Analysis::load(Some(&d)).err().expect("bad block_open").contains("bad regex"));
+    // so are fields that cannot work together: indentation excludes nesting, and a level that opens must close
+    write(&d, "spec17.json", r#"{"profiles":[{"name":"toy","ext":["toy"],"block_indent":true,"block_end":"^end"}]}"#);
+    assert!(Analysis::load(Some(&d)).err().expect("indent with end").contains("block_indent cannot be combined"));
+    write(&d, "spec17.json", r#"{"profiles":[{"name":"toy","ext":["toy"],"block_open":"do"}]}"#);
+    assert!(Analysis::load(Some(&d)).err().expect("open without close").contains("go together"));
+    write(&d, "spec17.json", r#"{"profiles":[{"name":"python","block_open":"do","block_close":"done"}]}"#);
+    assert!(Analysis::load(Some(&d)).err().expect("built-in indent profile plus nesting").contains("block_indent cannot be combined"));
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn test_boundaries_ignore_literals_and_nested_blocks() {
+    for (ext, text) in [
+        ("swift", "func testFirst() {\n  // [DEM\x2D01]\n  let s = \"}\"\n  /* } */\n  XCTAssertTrue(true)\n}\n\n// [DEM\x2D02]\n\nfunc helper() {}\n"),
+        ("swift", "@MainActor @Test func first() {\n  // [DEM\x2D01]\n  #expect(true)\n}\n\n// [DEM\x2D02]\n\nfunc helper() {}\n"),
+        ("js", "it('first', () => {\n  const s = 'a} // b';\n  // [DEM\x2D01]\n  expect(true);\n});\n\n// [DEM\x2D02]\n\nfoo();\n"),
+        ("rs", "#[test]\nfn first<'a>(x: &'a str) {\n    let c = '}';\n    // [DEM\x2D01]\n    assert!(true);\n}\n\n// [DEM\x2D02]\n\nfn helper() {}\n"),
+        ("sql", "CREATE FUNCTION test_first() RETURNS void AS $body$\n  -- [DEM\x2D01]\n  SELECT ok(true);\n$body$ LANGUAGE SQL;\n\n-- [DEM\x2D02]\n\nSELECT 1;\n"),
+        ("sql", "CREATE PROCEDURE test_first AS\nBEGIN\n  -- [DEM\x2D01]\n  SELECT CASE WHEN 1=1 THEN 1 ELSE 0 END;\n  EXEC tSQLt.AssertEquals 1, 1;\nEND;\n\n-- [DEM\x2D02]\n\nSELECT 1;\n"),
+        ("rb", "it 'first' do\nif true\nend\n  # [DEM\x2D01]\n  expect(true)\nend\n\n# [DEM\x2D02]\n\nputs 'outside'\n"),
+        ("lua", "it('first', function()\nif true then\nend\n  -- [DEM\x2D01]\n  assert(true)\nend)\n\n-- [DEM\x2D02]\n\nprint('outside')\n"),
+        ("pas", "procedure TestFirst;\nbegin\nbegin\nend;\n  // [DEM\x2D01]\n  AssertTrue(true);\nend;\n\n// [DEM\x2D02]\n\nprocedure helper;\n"),
+    ] {
+        let d = scratch(&format!("nested-{ext}"));
+        write(&d, "spec17.json", &format!(r#"{{"tests":["tests"],"ext":["{ext}"]}}"#));
+        write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
+        write(&d, &format!("tests/test_example.{ext}"), text);
+        let a = Analysis::load(Some(&d)).unwrap();
+        let cases = &a.tests_view().modules[0].files[0].tests;
+        assert_eq!(cases[0].ids, ["DEM-01"], "{ext}");
+        let r = a.report();
+        assert!(r.invalid_tests["no-assert"].is_empty(), "{ext}");
+        assert_eq!(r.invalid_tests["comment-only"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-02"], "{ext}");
+    }
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn a_body_that_never_balances_ends_at_the_next_tests_header() {
+    let d = scratch("unbalanced-body");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["rb"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
+    // the `unless` of the first test is never closed, so its nesting never returns to 0
+    write(&d, "tests/example_spec.rb", "it 'first' do\n  unless foo\n  # [DEM\x2D01]\nend\n\n# a note\nit 'second' do\n  # [DEM\x2D02]\n  expect(true)\nend\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!((cases[0].ids.clone(), cases[1].ids.clone()), (vec!["DEM-01".to_string()], vec!["DEM-02".to_string()]));
+    assert!(a.report().invalid_tests["comment-only"].is_empty());
+    // the first body stops before the second test's assertion
+    assert_eq!(a.report().invalid_tests["no-assert"].iter().map(|p| p.id.as_str()).collect::<Vec<_>>(), ["DEM-01"]);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn a_ruby_case_expression_closes_its_own_end() {
+    let d = scratch("ruby-case-expr");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["rb"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "tests/example_spec.rb", "# [DEM\x2D01]\nit 'maps' do\n  y = case z\n  when 1 then 2\n  end\n  expect(y).to eq(2)\nend\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn markers_of_one_declaration_are_one_test() {
+    let d = scratch("swift-two-markers");
+    write(&d, "spec17.json", r#"{"tests":["Tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "Tests/ExampleTests.swift", "// [DEM\x2D01]\n@Test\n@MainActor\nfunc testOne() { #expect(true) }\n\n@Test func testTwo() { #expect(true) }\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let names: Vec<_> = a.tests_view().modules[0].files[0].tests.iter().map(|t| t.name.clone()).collect();
+    assert_eq!(names, ["testOne", "testTwo"]);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn a_python_body_runs_past_a_wrapped_signature_and_comments() {
+    let d = scratch("python-wrapped-def");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["py"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "tests/test_example.py", "# [DEM\x2D01]\ndef test_wrapped(\n    a,\n):\n    x = a\n# a note\n    assert x\n\nvalue = 1\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn a_python_multiline_string_does_not_end_the_body() {
+    let d = scratch("python-multiline-string");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["py"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "tests/test_example.py", "# [DEM\x2D01]\ndef test_text():\n    x = \"\"\"\nflush left\n\"\"\"\n    assert x\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn a_one_line_test_above_is_not_the_next_tests_header() {
+    let d = scratch("swift-one-liners");
+    write(&d, "spec17.json", r#"{"tests":["Tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "Tests/ExampleTests.swift", "@Test func a() { #expect(true) } // [DEM\x2D01]\n@Test func b() { #expect(true) }\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!((cases[0].ids.len(), cases[1].ids.len()), (1, 0));
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn a_brace_in_a_test_callbacks_parameters_is_not_its_body() {
+    let d = scratch("ts-default-brace");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["ts"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "tests/a.test.ts", "// [DEM\x2D01]\nit(\"works\", (ctx = {}) => {\n  const x = 1;\n  expect(x).toBe(1);\n});\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+}
+
+#[doc = "[SCAN-37]"]
+#[test]
+fn swift_backticked_test_names_are_detected() {
+    let d = scratch("swift-backticks");
+    write(&d, "spec17.json", r#"{"tests":["Tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    write(&d, "Tests/ExampleTests.swift", "// [DEM\x2D01]\n@objc(testWorks) func `test does work`() { XCTAssertTrue(true) }\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!(cases.len(), 1);
+    assert_eq!(cases[0].name, "test does work");
+    assert_eq!(cases[0].ids, ["DEM-01"]);
+}
+
+#[doc = "[SCAN-38]"]
+#[test]
+fn example_profile_configuration_loads() {
+    let d = scratch("example-config");
+    write(&d, "spec17.json", include_str!("../../spec17.example.json"));
+    assert!(Project::open(Some(&d)).is_ok());
+}
+
+#[doc = "[SCAN-34]"]
+#[test]
+fn profile_patterns_accept_ordered_lists_and_validate_every_entry() {
+    let d = scratch("profile-pattern-lists");
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
+    let config = r#"{"profiles":[{"name":"example","ext":["xyz"],"comment":["//"],"decl":["^fn (a)","^fn (\\w+)"],"assert":["unmatched!","check!"],"off":["NEVER_SKIP","SKIP"],"test":["^other/","^tests/"],"case":["^CASE$","^OTHER$"],"annotation":["^NOPE","^@"]}]}"#;
+    write(&d, "spec17.json", config);
+    write(&d, "src/app.xyz", "fn app() {}\n");
+    write(&d, "tests/example.xyz", "// [DEM\x2D01]\nCASE\nfn alpha() {\n check!(true)\n}\n\n@SKIP\n// [DEM\x2D02]\nOTHER\nfn beta() {\n check!(true)\n}\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!(cases.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["a", "beta"]);
+    assert_eq!(cases[0].ids, ["DEM-01"]);
+    assert_eq!(a.report().invalid_tests["disabled"][0].id, "DEM-02");
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+    write(&d, "spec17.json", &config.replace("\"check!\"", "\"(\""));
+    assert!(Analysis::load(Some(&d)).err().unwrap().contains("bad regex"));
 }
 
 #[doc = "[SCAN-34]"]
@@ -258,6 +625,7 @@ fn index(d: &Path, with_edges_kind: bool) {
         create table edges(id integer primary key, source text, target text, {});
         create virtual table nodes_fts using fts5(name, qualified_name, content='nodes', content_rowid='rowid');
         create table schema_versions(version int, applied_at int, description text);
+        create table files(path text primary key, content_hash text not null);
         insert into schema_versions values (11, 0, 'x');
         insert into nodes values ('t1','function','a','a','tests/DemoTests.swift',1,3,null),
                                  ('n1','struct','Demo','Demo','src/Demo.swift',2,4,'internal'),
@@ -266,6 +634,58 @@ fn index(d: &Path, with_edges_kind: bool) {
         insert into nodes_fts(rowid, name, qualified_name) select rowid, name, qualified_name from nodes;
     ", if with_edges_kind { "kind text" } else { "other text" },
         if with_edges_kind { "insert into edges(source,target,kind) values ('t1','n2','calls'),('n2','n1','references');" } else { "" })).unwrap();
+}
+
+/// Records `rel` in the fixture index with the SHA-256 of its current content, as CodeGraph does when it reads the file.
+fn stamp(d: &Path, rel: &str) {
+    use sha2::{Digest, Sha256};
+    let hash: String = Sha256::digest(fs::read(d.join(rel)).unwrap()).iter().map(|b| format!("{b:02x}")).collect();
+    Connection::open(d.join(".codegraph/codegraph.db")).unwrap().execute("insert or replace into files values (?1, ?2)", [rel, &hash]).unwrap();
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn indexed_test_boundaries_are_shared_and_stale_indexes_fall_back() {
+    let d = scratch("indexed-test-boundaries");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["swift"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n");
+    let test = "func testExample() {\n  let text = #\"a \" } b\"#\n  // [DEM\x2D01]\n  XCTAssertTrue(true)\n}\n";
+    write(&d, "tests/DemoTests.swift", test);
+    index(&d, true);
+    let c = Connection::open(d.join(".codegraph/codegraph.db")).unwrap();
+    c.execute_batch("delete from nodes; insert into nodes values ('t','method','testExample','testExample','tests/DemoTests.swift',1,5,null);").unwrap();
+    drop(c);
+    let ids = |d: &Path| Analysis::load(Some(d)).unwrap().tests_view().modules[0].files[0].tests[0].ids.clone();
+    let qualified = |d: &Path| Analysis::load(Some(d)).unwrap().tests_view().modules[0].files[0].tests[0].qualified.clone();
+    assert!(qualified(&d).is_empty());
+    // an index with no record of the file is not trusted: the lexer reads the raw string wrong, so the tag is a comment only
+    assert!(ids(&d).is_empty());
+    stamp(&d, "tests/DemoTests.swift");
+    assert_eq!(qualified(&d), "testExample");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert_eq!(a.tests_view().modules[0].files[0].tests[0].ids, ["DEM-01"]);
+    assert!(a.report().invalid_tests["comment-only"].is_empty());
+    assert!(a.report().invalid_tests["no-assert"].is_empty());
+    drop(a);
+    // a clock decides nothing: the same content in a much newer file is still what the index read
+    let file = fs::OpenOptions::new().write(true).open(d.join("tests/DemoTests.swift")).unwrap();
+    file.set_times(fs::FileTimes::new().set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(3600))).unwrap();
+    assert_eq!(ids(&d), ["DEM-01"]);
+    // changed content is stale, however old the file looks
+    write(&d, "tests/DemoTests.swift", &format!("{test}\n"));
+    file.set_times(fs::FileTimes::new().set_modified(std::time::SystemTime::UNIX_EPOCH)).unwrap();
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.tests_view().modules[0].files[0].tests[0].ids.is_empty());
+    assert_eq!(a.report().invalid_tests["comment-only"][0].id, "DEM-01");
+    drop(a);
+    assert!(qualified(&d).is_empty(), "a stale index names no declaration either");
+    // fresh again, but the range is no function or method of the index
+    stamp(&d, "tests/DemoTests.swift");
+    assert_eq!(ids(&d), ["DEM-01"]);
+    let c = Connection::open(d.join(".codegraph/codegraph.db")).unwrap();
+    c.execute_batch("update nodes set kind='class' where id='t'").unwrap();
+    drop(c);
+    assert!(ids(&d).is_empty());
 }
 
 #[doc = "[GRAPH-01, GRAPH-04]"]
@@ -308,10 +728,10 @@ fn codegraph_schema_drift_is_an_error_not_a_panic() {
 #[test]
 fn every_profile_compiles() {
     for p in spec17_core::detect::PROFILES.iter() {
-        for rx in [&p.decl, &p.assert, &p.off, &p.test, &p.case] {
+        for rx in [&p.decl, &p.assert, &p.off, &p.test, &p.case].into_iter().flatten() {
             regex::Regex::new(rx).unwrap_or_else(|e| panic!("{}: {rx}: {e}", p.name));
         }
-        assert!(p.decl.contains('('), "{}: decl needs a name group", p.name);
+        assert!(p.decl.iter().all(|s| s.contains('(')), "{}: decl needs a name group", p.name);
     }
     // spec_format.toml: group 1 of a requirement line is the ID, so the patterns may not capture
     let f = &*spec17_core::scan::FORMAT;
@@ -577,11 +997,13 @@ fn modules_and_test_cases() {
         create table nodes(id text primary key, kind text, name text, qualified_name text, file_path text, start_line int, end_line int, visibility text);
         create table edges(id integer primary key, source text, target text, kind text);
         create table schema_versions(version int, applied_at int, description text);
+        create table files(path text primary key, content_hash text not null);
         insert into schema_versions values (11, 0, 'x');
         insert into nodes values ('a1','function','f','a::f','a/src/lib.rs',1,1,null), ('b1','function','f','b::f','b/src/lib.rs',1,1,null),
                                  ('w1','function','works','a::works','a/tests/t.rs',3,5,null);
         insert into edges(source,target,kind) values ('a1','b1','calls'), ('w1','a1','calls');
     ").unwrap();
+    stamp(&d, "a/tests/t.rs"); // the index read this file: its declaration names count
     let m = Analysis::load(Some(&d)).unwrap().modules_view();
     assert!(m.index);
     let a = m.modules.iter().find(|x| x.path == "a").unwrap();
@@ -669,11 +1091,45 @@ fn consecutive_ids_print_as_a_range() {
     assert_eq!(spec17_core::scan::ranges(["DOC-01", "DOC-02", "DOC-03", "DOC-07", "SEC-4"]), "DOC-01..03,DOC-07,SEC-04");
 }
 
+/// Lines of the body that starts at line 1 of `ls`, read with the profile of `file`'s extension.
+fn body_len(file: &str, ls: &[String]) -> usize {
+    // `fixture` rebuilds its folder on every call, so tests that run side by side each need their own
+    static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+    let a = Analysis::load(Some(&fixture(&format!("body-lang-{}", N.fetch_add(1, std::sync::atomic::Ordering::Relaxed))))).unwrap();
+    spec17_core::scan::body(ls, 1, 200, a.p.lang(file)).len()
+}
+
 #[doc = "[SCAN-08]"]
 #[test]
 fn a_tests_body_stops_at_its_closing_brace() {
     let ls: Vec<String> = ["@Test(\"[A-1]\")", "func f() {", "  x()", "}", "other"].iter().map(|s| s.to_string()).collect();
-    assert_eq!(spec17_core::scan::body(&ls, 1, 200).len(), 4);
+    assert_eq!(body_len("a.swift", &ls), 4);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn test_body_ignores_braces_in_rust_raw_strings_and_comments() {
+    let ls: Vec<String> = ["fn test_example() {", "  let x = r##\"first \" }", "  { second\"##;", "  /* }", "  { */", "  assert!(true);", "}", "after"].into_iter().map(str::to_string).collect();
+    assert_eq!(body_len("a.rs", &ls), 7);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn test_body_reads_quotes_and_comments_by_profile() {
+    let lines = |ls: &[&str]| ls.iter().map(|s| s.to_string()).collect::<Vec<String>>();
+    // a single-quoted JavaScript string is a string, whatever it holds; `//` inside it is no comment and `}` does not close the test
+    assert_eq!(body_len("a.js", &lines(&["it('x', () => {", "  const s = 'a} // b'; const t = 'it\\'s }';", "  expect(s);", "});", "after"])), 4);
+    // a `#` comment with an odd quote does not swallow the lines below it
+    assert_eq!(body_len("a.py", &lines(&["def f():", "  # it's \"odd", "  x = {", "  }", "  assert x", "after"])), 4);
+    // Rust: a lifetime is not a string, a char literal is
+    assert_eq!(body_len("a.rs", &lines(&["fn f<'a>(x: &'a str) {", "  let c = '}'; let d = '\\'';", "}", "after"])), 3);
+}
+
+#[doc = "[SCAN-35]"]
+#[test]
+fn test_body_ignores_braces_in_multiline_quoted_strings() {
+    let ls: Vec<String> = ["func testExample() {", "  let x = \"\"\"", "  a \" }", "  \"\"\"", "  XCTAssertTrue(true)", "}", "after"].into_iter().map(str::to_string).collect();
+    assert_eq!(body_len("a.swift", &ls), 6);
 }
 
 #[doc = "[SCAN-18, SCAN-19]"]
@@ -744,7 +1200,7 @@ fn changes_by_ref_commit_rename_delete_whitespace_and_history() {
     let d = scratch("changes2");
     write(&d, "spec17.json", r#"{"src":["src"],"tests":["tests"],"ext":["kt"]}"#);
     write(&d, ".spec17ignore", "hidden/\n");
-    write(&d, "specs/a.md", "- **AAA-01** MUST — one.\n- **AAA-02** MUST — two.\n- **AAA-03** MUST — three.\n");
+    write(&d, "specs/a.md", "- **AAA-01** MUST — one.\n- **AAA-02** MUST — two [P2] [M].\n- **AAA-03** MUST — three.\n");
     write(&d, "tests/AT.kt", "// [AAA\x2D01]\nfun t1() {\n    check(1)\n}\n\n// [AAA\x2D02]\nfun t2() {\n    check(2)\n}\n");
     write(&d, "src/old.kt", "// (AAA-01)\nfun f() {\n    1\n}\n");
     write(&d, "notes.txt", "n\n");
@@ -760,7 +1216,7 @@ fn changes_by_ref_commit_rename_delete_whitespace_and_history() {
     git(&["checkout", "-qb", "feature"]);
     // commit 1: edit the AAA-02 test only, drop AAA-03, rename old.kt
     write(&d, "tests/AT.kt", "// [AAA\x2D01]\nfun t1() {\n    check(1)\n}\n\n// [AAA\x2D02]\nfun t2() {\n    check(22)\n}\n");
-    write(&d, "specs/a.md", "- **AAA-01** MUST — one.\n- **AAA-02** MUST — two.\n");
+    write(&d, "specs/a.md", "- **AAA-01** MUST — one.\n- **AAA-02** MUST — two [P2] [M].\n");
     git(&["mv", "src/old.kt", "src/new.kt"]);
     write(&d, "notes.txt", "n2\n");
     write(&d, "hidden/h.kt", "y\n");
@@ -785,6 +1241,8 @@ fn changes_by_ref_commit_rename_delete_whitespace_and_history() {
     assert_eq!(c.files[1].old_path.as_deref(), Some("src/old.kt"));
     // (the whitespace-only edit of the renamed cited function is no change: SCAN-32)
     assert_eq!(ids(&c), ["AAA-02:test", "AAA-03:spec"], "{c:?}");
+    let changed = c.requirements.iter().find(|r| r.id == "AAA-02").unwrap();
+    assert_eq!((changed.priority.as_deref(), changed.effort.as_deref()), (Some("P2"), Some("M")));
     let gone = c.requirements.iter().find(|r| r.id == "AAA-03").unwrap();
     assert!(gone.deleted && gone.state == "deleted" && gone.text.contains("three"), "{gone:?}");
     assert!(c.text().contains("(from src/old.kt)"));

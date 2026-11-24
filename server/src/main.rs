@@ -606,6 +606,54 @@ mod tests {
         assert!(st == StatusCode::OK && body.contains("2026-07-28"), "{st} {body}");
     }
 
+    #[doc = "[API-25]"]
+    #[tokio::test]
+    async fn mcp_skills_extension_serves_embedded_skill() {
+        let (app, _) = routers(app_state(Some(repo()), &[7411]));
+        let call = async |method: &str, params: serde_json::Value| {
+            let mut params = params;
+            params["_meta"] = json!({"io.modelcontextprotocol/protocolVersion":"2026-07-28", "io.modelcontextprotocol/clientInfo":{"name":"t","version":"1"}, "io.modelcontextprotocol/clientCapabilities":{}});
+            let body = json!({"jsonrpc":"2.0", "id":1, "method":method, "params":params}).to_string();
+            let mut req = post("/mcp", "127.0.0.1:7411", &body);
+            req.headers_mut().insert("mcp-protocol-version", "2026-07-28".parse().unwrap());
+            req.headers_mut().insert("mcp-method", method.parse().unwrap());
+            if let Some(uri) = params.get("uri").and_then(|v| v.as_str()) {
+                req.headers_mut().insert("mcp-name", uri.parse().unwrap());
+            }
+            let (status, body) = send(&app, req).await;
+            assert_eq!(status, StatusCode::OK, "{body}");
+            serde_json::from_str::<serde_json::Value>(&body).unwrap()
+        };
+        let discover = call("server/discover", json!({})).await;
+        assert!(discover["result"]["capabilities"]["extensions"]["io.modelcontextprotocol/skills"].is_object());
+        let list = call("skills/list", json!({})).await;
+        for cursor in ["invalid", ""] {
+            let invalid = call("skills/list", json!({"cursor":cursor})).await;
+            assert_eq!(invalid["error"]["code"], -32602);
+        }
+        let entry = &list["result"]["skills"][0];
+        let uri = "skill://spec17/SKILL.md";
+        assert_eq!(entry["uri"], uri);
+        assert_eq!(entry["frontmatter"]["name"], "spec17");
+        let resources = call("resources/list", json!({})).await;
+        assert!(resources["result"]["resources"].as_array().unwrap().iter().any(|r| r["uri"] == uri));
+        let get = call("skills/get", json!({"uri":uri})).await;
+        assert_eq!(get["result"]["skill"], *entry);
+        let read = call("resources/read", json!({"uri":uri})).await;
+        let contents = &read["result"]["contents"][0];
+        assert_eq!(contents["mimeType"], "text/markdown");
+        assert_eq!(contents["text"], skill::SKILL);
+        let served = contents["text"].as_str().unwrap();
+        let frontmatter = served.split_inclusive('\n').skip(1).take_while(|line| *line != "---\n").collect::<String>();
+        assert_eq!(entry["frontmatter"], yaml_serde::from_str::<serde_json::Value>(&frontmatter).unwrap());
+        let manifest: rmcp::model::SkillResource = serde_json::from_value(entry["resources"][0].clone()).unwrap();
+        manifest.verify(contents["text"].as_str().unwrap().as_bytes()).unwrap();
+        let unknown = call("skills/get", json!({"uri":"skill://missing/SKILL.md"})).await;
+        assert_eq!(unknown["error"]["code"], -32602);
+        let unknown = call("resources/read", json!({"uri":"skill://spec17/missing.md"})).await;
+        assert_eq!(unknown["error"]["code"], -32602);
+    }
+
     #[doc = "[API-08]"]
     #[tokio::test]
     async fn subscription_notifies_when_the_repo_changes() {
@@ -956,12 +1004,12 @@ mod tests {
         for (location, expected) in [
             (json!({}), vec!["AAA-01", "AAA-02", "AAA-03", "AAA-04"]),
             (json!({"line": 1}), vec![]),
-            (json!({"line": 4}), vec!["AAA-01", "AAA-02"]),
+            (json!({"line": 4}), vec!["AAA-01", "AAA-02", "AAA-03"]),
             (json!({"line": 6}), vec![]),
             (json!({"line": 10}), vec!["AAA-02", "AAA-04"]),
-            (json!({"line": 1, "end_line": 3}), vec!["AAA-01", "AAA-02"]),
-            (json!({"line": 4, "end_line": 9}), vec!["AAA-01", "AAA-02"]),
-            (json!({"line": 4, "end_line": 10}), vec!["AAA-01", "AAA-02", "AAA-04"]),
+            (json!({"line": 1, "end_line": 3}), vec!["AAA-01", "AAA-02", "AAA-03"]),
+            (json!({"line": 4, "end_line": 9}), vec!["AAA-01", "AAA-02", "AAA-03"]),
+            (json!({"line": 4, "end_line": 10}), vec!["AAA-01", "AAA-02", "AAA-03", "AAA-04"]),
         ] {
             let mut args = location;
             args["test_file"] = json!(file);
