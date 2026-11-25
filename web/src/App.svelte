@@ -1004,7 +1004,7 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
       {#if requirementCycles.length}
         <p><b>Circular reference groups:</b> {#each requirementCycles as group}<span class="cycle-group">{"{"}{#each group as id, i}{#if i}{", "}{/if}<a href={u(req(id))}>{id}</a>{/each}{"}"}</span>{/each}</p>
       {:else}<p class="muted">No circular references detected.</p>{/if}
-      <Graph items={requirementGraph} label="requirement reference graph" legend="Arrow: the requirement references the one it points to. Highlighted arrows and rings mark circular references." tip={requirementTip} group={idPrefix} q={query} cycleGroups={requirementCycles} open={(id) => navigate(req(id))} />
+      <Graph items={requirementGraph} label="requirement reference graph" legend="Arrow: the requirement references the one it points to. Highlighted arrows and rings mark circular references. Colour: ID prefix." tip={requirementTip} group={idPrefix} q={query} cycleGroups={requirementCycles} open={(id) => navigate(req(id))} />
     {:else}
     {@render requirementToolbar()}
     <Split showPreview={!!route.id}>

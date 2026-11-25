@@ -3,7 +3,7 @@
   // nodes (area by `size`, an outline by `ring`), the arrows (width by `weight`) and the words (label, legend, tooltip).
   import { untrack } from "svelte";
   import { forceCollide, forceLink, forceManyBody, forceSimulation, forceX, forceY, type Simulation, type SimulationNodeDatum } from "d3-force";
-  import { components, prefixForce, reduceCrossings, separate } from "$lib/requirements/layout";
+  import { components, homeFor, prefixForce, reduceCrossings, separate } from "$lib/requirements/layout";
 
   type Item = { id: string; size: number; ring?: boolean; links: { to: string; weight: number }[]; data: T };
   type N = SimulationNodeDatum & { id: string; data: T; r: number; size: number; ring: boolean; deg: number; dependents: number; hue: number; x: number; y: number };
@@ -18,7 +18,7 @@
     legend: string;
     /** What hovering a node says: a bold title, an optional note after it, and a detail clamped to five lines. */
     tip: (node: { id: string; size: number; deg: number; dependents: number; data: T }) => { title: string; meta?: string; detail: string };
-    /** The group a node belongs to. Given, nodes of one group attract each other and clusters of different groups stay apart (WEB-53), and crossings are reduced (WEB-48). */
+    /** The group a node belongs to. Given, nodes of one group attract each other and start in one block (WEB-53), and crossings are reduced (WEB-48). */
     group?: (id: string) => string;
     /** Ids in circular groups: their nodes and the arrows between them are drawn in the warning colour. */
     cycleGroups?: string[][];
@@ -43,7 +43,8 @@
 
   // a colour per folder, so nodes that live together look alike
   // green (90–180°) is skipped: the ring is green, so no fill should be
-  const hueOf = (path: string) => (180 + ([...(path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : path)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7) * 270) / 360) % 360;
+  const hueAt = (t: number) => (180 + t * 270) % 360;
+  const hueOf = (path: string) => hueAt([...(path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : path)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) % 360, 7) / 360);
   const ends = (l: L) => [l.source as N, l.target as N] as const; // d3 swaps the ids for the nodes
   // connected hubs need more room (WEB-46); like charges repel, more for a bigger node
   const distance = (l: L) => 50 + (l.source as N).r + (l.target as N).r + 8 * Math.sqrt((l.source as N).deg + (l.target as N).deg);
@@ -53,39 +54,58 @@
     const max = Math.max(1, ...items.map((m) => m.size));
     const rmax = Math.max(14, Math.min(64, 320 / Math.sqrt(items.length))); // the biggest node; the rest by area
     const first = untrack(() => pos.size === 0);
-    const ns: N[] = items.map((m) => ({ id: m.id, data: m.data, size: m.size, r: Math.max(4, rmax * Math.sqrt(m.size / max)), ring: !!m.ring, deg: 0, dependents: 0, hue: hueOf(m.id), x: NaN, y: NaN, ...pos.get(m.id) }));
+    // (WEB-53) groups take evenly spaced colours in order of appearance: hashing short prefixes made several look alike
+    const groups = group ? [...new Set(items.map((m) => group(m.id)))] : [];
+    const hue = (id: string) => (group ? hueAt(groups.indexOf(group(id)) / groups.length) : hueOf(id));
+    const ns: N[] = items.map((m) => ({ id: m.id, data: m.data, size: m.size, r: Math.max(4, rmax * Math.sqrt(m.size / max)), ring: !!m.ring, deg: 0, dependents: 0, hue: hue(m.id), x: NaN, y: NaN, ...pos.get(m.id) }));
     ns.sort((a, b) => b.r - a.r); // big first, so small nodes are drawn (and hit) on top
     const byId = new Map(ns.map((n) => [n.id, n]));
     const ls: L[] = items.flatMap((m) => m.links.filter((d) => byId.has(d.to)).map((d) => ({ source: m.id, target: d.to, weight: d.weight })));
     for (const l of ls) for (const e of [l.source, l.target]) byId.get(e as string)!.deg++;
     for (const l of ls) byId.get(l.target as string)!.dependents++; // (WEB-54)
     sim?.stop();
+    // (WEB-53) a node added since the first layout has no place yet: with nothing repelling, the origin would drop it in any block
+    if (!first && group) for (const n of ns) {
+      if (centers.has(n.id)) continue;
+      const known = ns.filter((m) => centers.has(m.id));
+      const at = (list: N[]) => list.map((m) => centers.get(m.id)!);
+      const home = homeFor(at(known.filter((m) => group(m.id) === group(n.id))), at(known), 8 * n.r);
+      centers.set(n.id, home);
+      [n.x, n.y] = [home.x + 1, home.y + 1]; // just off the peer it shares the place with, so collision can part them
+    }
     // seed new nodes with d3's spread instead of piling them at the origin
     sim = forceSimulation(ns)
       .force("link", forceLink<N, L>(ls).id((n) => n.id).distance(distance).strength(0.5))
-      // gravity pulls everything to the middle (or to its cluster's centre), collision is a hard core: atoms never overlap
-      .force("charge", forceManyBody<N>().strength(charge).distanceMin(20))
+      // gravity pulls everything to the middle (or to its cluster's centre), collision is a hard core: atoms never overlap.
+      // Grouped, nothing repels: all-pairs repulsion would blow the tight blocks apart on the first drag (WEB-53)
+      .force("charge", group ? null : forceManyBody<N>().strength(charge).distanceMin(20))
       .force("gravity-x", forceX<N>((n) => centers.get(n.id)?.x ?? 0).strength(0.12))
       .force("gravity-y", forceY<N>((n) => centers.get(n.id)?.y ?? 0).strength(0.12))
       .force("collide", forceCollide<N>((n) => n.r + 12).strength(1).iterations(3))
       .stop();
-    sim.tick(250); // settled before the first paint: no animation on load
-    if (first) { // (WEB-50)
+    if (!first) sim.tick(250); // settled before the first paint: no animation on load
+    else { // (WEB-50) each cluster is laid out alone and then placed, so a run over the whole graph would be thrown away
+      sim.alpha(sim.alphaMin()); // but left as cool as after that run, or the first drag would reshuffle everything
       const edges = ls as { source: N; target: N; weight: number }[];
       const clusters = components(ns, edges); // connected nodes, whatever the direction
       const clusterOf = new Map(clusters.flatMap((cluster, i) => cluster.map((node) => [node, i] as const)));
       const edgesByCluster = clusters.map(() => [] as typeof edges);
       for (const edge of edges) edgesByCluster[clusterOf.get(edge.source)!].push(edge);
       for (const [i, cluster] of clusters.entries()) {
-        forceSimulation(cluster)
+        if (cluster.length === 1) continue; // nothing to arrange
+        const own = forceSimulation(cluster)
           .force("link", forceLink<N, L>(edgesByCluster[i]).id((n) => n.id).distance(distance).strength(0.5))
           .force("charge", forceManyBody<N>().strength(charge).distanceMin(20))
           .force("x", forceX(0).strength(0.12)).force("y", forceY(0).strength(0.12))
           .force("group", group ? prefixForce<N>((n) => [group(n.id)]) : null) // (WEB-53)
-          .force("collide", forceCollide<N>((n) => n.r + 12).strength(1).iterations(3)).stop().tick(200);
+          .force("collide", forceCollide<N>((n) => n.r + 12).strength(1).iterations(3)).stop();
+        own.tick(250);
+        own.alpha(1).tick(200); // reheated once: a large cluster ends with fewer crossings than after a single run
         if (group) reduceCrossings(cluster, edgesByCluster[i], (n) => n.r + 12); // (WEB-48) the collide radius: atoms never overlap
       }
-      centers = new Map([...separate(clusters, 60, group && ((n: N) => group(n.id)))].map(([n, center]) => [n.id, center]));
+      const placed = separate(clusters, 60, group && ((n: N) => group(n.id)));
+      // grouped, gravity holds each node where it was placed; else at its cluster's centre
+      centers = new Map(ns.map((n) => [n.id, group ? { x: n.x, y: n.y } : placed.get(n)!]));
     }
     sim.nodes(ns).force("gravity-x", forceX<N>((n) => centers.get(n.id)?.x ?? 0).strength(0.12))
       .force("gravity-y", forceY<N>((n) => centers.get(n.id)?.y ?? 0).strength(0.12));
@@ -219,7 +239,8 @@
       ctx.lineWidth = (cycleOf.has(n.id) ? 2.5 : n.ring ? 1.75 : 1) / Math.sqrt(view.k);
       ctx.stroke();
       if (n.r >= 14 || view.k > 1.3 || (q && lit(n))) {
-        const label = { x: n.x, y: n.y + n.r + 20 / view.k, w: ctx.measureText(n.id).width, h: labelSize / view.k };
+        // the baseline sits just far enough down to clear the node: any lower and the name reads as the next node's
+        const label = { x: n.x, y: n.y + n.r + (labelSize + 1) / view.k, w: ctx.measureText(n.id).width, h: labelSize / view.k };
         if ((q && lit(n)) || !labels.some((p) => Math.abs(p.x - label.x) < (p.w + label.w) / 2 + 4 / view.k && Math.abs(p.y - label.y) < Math.max(p.h, label.h))) {
           labels.push(label);
           ctx.fillStyle = fg;

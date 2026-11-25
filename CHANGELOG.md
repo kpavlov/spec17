@@ -3,6 +3,10 @@
 ## 0.5.0 - Unreleased
 
 - Add a `.gitignore` to the installed skill folder so the on-disk copy stays out of git; it is not served as an MCP skill resource.
+- Start the requirement graph with requirements of the same ID prefix together in one block; linked requirements stay together, in the block of their most common prefix.
+- Colour the requirement graph by ID prefix, put graph labels closer to their own node, and open graphs sooner when most nodes are unlinked.
+- Fix the requirement graph spreading off the canvas after dragging a node, and keep requirements added by a rescan with their prefix.
+- Have the agent skill prefer updating an existing requirement, while it stays small, over adding one for behaviour that is not really new.
 
 ## 0.4.0
 
