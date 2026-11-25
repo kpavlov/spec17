@@ -34,7 +34,7 @@ help:
 	@echo "make bench    time spec17 on a generated repo at REVS (default: main HEAD; . = working tree), SCALE=1 RUNS=10 JSON=1"
 	@echo "make screenshots  retake docs/static/img from a deliberately broken tree (restored after; needs Chrome)"
 	@echo "make docs    build the Hugo site in docs/ into docs/public (needs Hugo >= 0.146); make site serves it with live reload on :1313 and opens it (reusing a Chrome tab on the site; OPEN=0: don't open)"
-	@echo "make upgrade   bump web (pnpm, to latest) and Rust (cargo update; cargo upgrade --incompatible if cargo-edit is installed) dependencies"
+	@echo "make upgrade   bump web (pnpm, to latest) and Rust (cargo update; cargo upgrade --incompatible if cargo-edit is installed) dependencies, then regenerate NOTICES"
 	@echo "override: make dev ROOT=/path/to/repo PORT=7500 OPEN=0   (OPEN=0: don't open the browser)"
 
 web/node_modules: web/package.json
@@ -200,12 +200,13 @@ parity:
 	done
 
 # pnpm goes to latest, past the ranges in package.json; plain cargo only updates Cargo.lock within Cargo.toml ranges, so
-# major bumps need cargo-edit (cargo install cargo-edit). Run `make test` and `cd web && pnpm run check` after.
+# major bumps need cargo-edit (cargo install cargo-edit). Ends with `make notices`, since the shipped dependencies changed. Run `make test` and `cd web && pnpm run check` after.
 upgrade:
 	cd web && pnpm update --latest
 	cargo update
 	@if cargo upgrade --help >/dev/null 2>&1; then cargo upgrade --incompatible && cargo update; \
 	else echo "cargo-edit not installed: Cargo.toml ranges kept (cargo install cargo-edit for major bumps)"; fi
+	$(MAKE) notices
 
 clean:
 	cargo clean
