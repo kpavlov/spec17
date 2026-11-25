@@ -301,9 +301,7 @@ pub fn suggestions(st: &InstallStatus) -> Vec<String> {
     use {McpState as M, SkillState as S};
     let (p, g) = (&st.project, &st.global);
     let mut out = vec![];
-    if p.skill == S::Missing && g.skill == S::Missing {
-        out.push("skill not installed: `spec17 install` (this repo) or `spec17 install --global`".to_string());
-    } else if p.skill == S::Outdated || (p.skill == S::Missing && g.skill == S::Outdated) {
+    if p.skill == S::Outdated || (p.skill == S::Missing && g.skill == S::Outdated) {
         out.push("installed skill is out of date: run `spec17 install`".to_string());
     }
     if ![p.mcp, p.mcp_stdio, g.mcp, g.mcp_file, g.mcp_stdio].contains(&M::Ok) {
@@ -496,7 +494,7 @@ mod tests {
         std::fs::create_dir_all(repo.join("specs")).unwrap();
         let st = status(Some(&repo), 7411).unwrap();
         assert!(st.project.skill == SkillState::Missing && st.project.mcp == McpState::Missing);
-        assert!(suggestions(&st).len() >= 1 || st.global.skill != SkillState::Missing); // a real ~/.agents may already hold it
+        assert!(!suggestions(&st).is_empty() || [st.global.mcp, st.global.mcp_file, st.global.mcp_stdio].contains(&McpState::Ok)); // a real global config may already have an entry
         apply(Some(&repo), false, Some(7411), None, McpTransport::Http).unwrap();
         let st = status(Some(&repo), 7411).unwrap();
         assert!(st.project.skill == SkillState::Current && st.project.mcp == McpState::Ok);

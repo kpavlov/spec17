@@ -139,7 +139,7 @@
   let busy = $state(false);
   let checks = $state<{ name: string; level: string; detail: string; hint: string | null }[]>([]);
   // the Settings button flags a failed check (red) or an unfinished install (amber)
-  const setupBadge = $derived(checks.some((k) => k.level === "fail") ? "bad" : checks.some((k) => k.level !== "ok") || setup?.suggestions.length ? "warn" : "");
+  const setupBadge = $derived(checks.some((k) => k.level === "fail") ? "bad" : checks.some((k) => k.level === "warn") || setup?.suggestions.length ? "warn" : "");
   let indexAction = $state<"init" | "sync" | null>(null);
   let indexLog = $state("");
   let specFiles = $state<string[] | null>(null);
@@ -778,7 +778,7 @@
       {@const cgIdx = checks.find((k) => k.name === "codegraph index")}
       {@const cgMcp = setup.status.project.codegraph_mcp === "ok" ? "this repo" : setup.status.global.codegraph_mcp === "ok" ? "global" : ""}
       {@const passed = checks.filter(k => k.level === "ok")}
-      {@const issues = checks.filter(k => k.level !== "ok")}
+      {@const issues = checks.filter(k => k.level === "warn" || k.level === "fail")}
       {@const where = globalScope ? setup.status.global : setup.status.project}
       {@const scope = globalScope ? "Global" : "This repo"}
       {@const fails = issues.filter((k) => k.level === "fail").length}
@@ -791,18 +791,18 @@
           <div>
             <div class="eyebrow muted">Health{#if setup.version} · spec17 {setup.version}{/if}</div>
             <h2 id="health-title" role="status">{fails ? plural(fails, "check") + " failed" : issues.length ? plural(issues.length, "warning") : checks.length ? "All checks passed" : "No checks run yet"}</h2>
-            <div class="muted">{passed.length} of {checks.length} checks passed{#if issues.length} · {plural(issues.length, "issue")}{/if}</div>
+            <div class="muted">{passed.length} of {passed.length + issues.length} checks passed{#if issues.length} · {plural(issues.length, "issue")}{/if}</div>
           </div>
           <button class="end" disabled={checking || busy} onclick={loadSetup}>{checking ? "Checking…" : "Run checks"}</button>
         </div>
         {#if setupError}<p class="error" role="alert">Could not refresh checks: {setupError}</p>{/if}
         {#snippet checkRow(k: (typeof checks)[number])}
           <div class="check-row">
-            <Pill tone={levelTone(k.level)}>{k.level === "ok" ? "Passed" : k.level === "warn" ? "Warning" : "Failed"}</Pill>
+            <Pill tone={levelTone(k.level)}>{k.level === "ok" ? "Passed" : k.level === "warn" ? "Warning" : k.level === "info" ? "Info" : "Failed"}</Pill>
             <div><strong>{k.name}</strong> · {k.detail}{#if k.hint}<div class="muted">{k.hint}</div>{/if}</div>
           </div>
         {/snippet}
-        {#each issues as k}{@render checkRow(k)}{/each}
+        {#each checks.filter((k) => k.level !== "ok") as k}{@render checkRow(k)}{/each}
         {#if passed.length}
           <details><summary>{issues.length ? `${plural(passed.length, "check")} passed` : "Show the checks"}</summary>
             {#each passed as k}{@render checkRow(k)}{/each}
@@ -849,7 +849,7 @@
       {#if noReqs}
         <section>
           <h3>No specs yet</h3>
-          <p>spec17 found no requirements in this repo and works without them: Modules and Tests still list its sources and tests. {setup.suggestions.length ? "Install the skill, then ask" : "Ask"} your agent to draft <code>specs/01-name.md</code> with you (lines like <code>- **ABC-12** MUST — text</code>). <a href="{docs}/specs/#requirement-styles" target="_blank" rel="noopener noreferrer">Requirement formats</a>.</p>
+          <p>spec17 found no requirements in this repo and works without them: Modules and Tests still list its sources and tests. {setup.suggestions.length ? "Finish the agent setup, then ask" : "Ask"} your agent to draft <code>specs/01-name.md</code> with you (lines like <code>- **ABC-12** MUST — text</code>). <a href="{docs}/specs/#requirement-styles" target="_blank" rel="noopener noreferrer">Requirement formats</a>.</p>
         </section>
       {/if}
       </section>

@@ -16,7 +16,7 @@ export const stateTone: Record<string, Tone> = { tested: "cyan", "src-only": "or
 // the row edge shows only the states that carry a verdict
 export const edgeTone = (state: string): Tone | undefined => (["orange", "red"].includes(stateTone[state]) ? stateTone[state] : undefined);
 // setup and doctor statuses
-export const levelTone = (level: string): Tone => (level === "ok" ? "ok" : level === "warn" ? "warn" : "bad");
+export const levelTone = (level: string): Tone => (level === "ok" || level === "warn" || level === "info" ? level : "bad");
 // what happened to a file: read like a diff (added green, deleted red); the requirement pages keep red and amber for the requirement state
 export const changeTone = (change: string): Tone => (change === "added" ? "ok" : change === "deleted" ? "bad" : "accent");
 

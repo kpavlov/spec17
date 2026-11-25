@@ -1,14 +1,14 @@
 //! `spec17 doctor`: is this repo set up for spec17, and is CodeGraph usable here? `run` only looks and suggests. The one thing that writes is `index`, which runs only when the user asks (`doctor --fix`, the Settings tab buttons, the dashboard's rescan).
 use serde::Serialize;
 use spec17_core::{Analysis, codegraph::{Graph, GraphError}, scan::Project};
-use crate::skill::McpState;
+use crate::skill::{InstallStatus, McpState, SkillState};
 use std::path::Path;
 use std::time::SystemTime;
 
 #[derive(Serialize, schemars::JsonSchema)]
 pub struct Check {
     pub name: &'static str,
-    /// `ok`, `warn` (works, but something is missing) or `fail` (spec17 cannot work here).
+    /// `ok`, `info` (nothing to fix), `warn` (works, but something is missing) or `fail` (spec17 cannot work here).
     pub level: &'static str,
     pub detail: String,
     pub hint: Option<String>,
@@ -68,6 +68,17 @@ pub fn suggested(checks: &[Check]) -> Option<&'static str> {
     let k = checks.iter().find(|k| k.name == "codegraph index")?;
     if checks.iter().any(|b| b.name == "codegraph binary" && b.level != "ok") { return None; }
     k.action
+}
+
+// (SETUP-06) a skill in no skills folder is only information: MCP Skills clients load it from the server
+fn agent_setup(st: &InstallStatus) -> Vec<Check> {
+    let mut out: Vec<Check> = crate::skill::suggestions(st).into_iter().map(|t| c("agent setup", "warn", t, Some("spec17 install"))).collect();
+    if st.project.skill == SkillState::Missing && st.global.skill == SkillState::Missing {
+        out.push(c("agent setup", "info", "no skill in a skills folder: clients with MCP Skills load it from the spec17 MCP server (Claude Code: `/spec17:spec17`)", Some("`spec17 install` copies it for other clients")));
+    } else if out.is_empty() {
+        out.push(c("agent setup", "ok", "skill and MCP entry installed", None));
+    }
+    out
 }
 
 // (SETUP-05, SETUP-06)
@@ -138,12 +149,7 @@ pub fn run(root: Option<&Path>, mcp_port: u16) -> Vec<Check> {
 
     match crate::skill::status(Some(&p.root), mcp_port) {
         Ok(st) => {
-            let todo = crate::skill::suggestions(&st);
-            if todo.is_empty() {
-                out.push(c("agent setup", "ok", "skill and MCP entry installed", None));
-            } else {
-                todo.iter().for_each(|t| out.push(c("agent setup", "warn", t.clone(), Some("spec17 install"))));
-            }
+            out.extend(agent_setup(&st));
             // (SETUP-10) CodeGraph is on this machine but the agent is not told about it
             if bin.is_some() && st.project.codegraph_mcp != McpState::Ok && st.global.codegraph_mcp != McpState::Ok {
                 out.push(c("agent setup", "warn", "no codegraph server in .mcp.json: the agent cannot use CodeGraph", Some("spec17 install --codegraph")));
@@ -159,6 +165,7 @@ pub fn text(checks: &[Check]) -> String {
     for k in checks {
         let tag = match k.level {
             "ok" => "ok  ",
+            "info" => "info",
             "warn" => "warn",
             _ => "FAIL",
         };
@@ -226,6 +233,20 @@ mod tests {
         assert!(cs.iter().any(|k| k.name == "codegraph index"));
         let t = text(&cs);
         assert!(t.contains("no specs found") && t.contains("works,"), "{t}");
+    }
+
+    #[doc = "[SETUP-06]"]
+    #[test]
+    fn a_skill_in_no_folder_is_only_info() {
+        let mut st = crate::skill::status(Some(&std::env::temp_dir()), 7411).unwrap();
+        (st.project.skill, st.global.skill, st.project.mcp) = (SkillState::Missing, SkillState::Missing, McpState::Ok); // whatever this machine has
+        assert!(crate::skill::suggestions(&st).is_empty());
+        let cs = agent_setup(&st);
+        assert_eq!(cs.iter().map(|k| k.level).collect::<Vec<_>>(), ["info"]);
+        let t = text(&cs);
+        assert!(t.contains("  info  agent setup") && t.contains("/spec17:spec17") && t.ends_with("all good\n"), "{t}");
+        st.global.skill = SkillState::Outdated; // a stale copy is still a warning
+        assert_eq!(agent_setup(&st).iter().map(|k| k.level).collect::<Vec<_>>(), ["warn"]);
     }
 
     #[doc = "[SETUP-08, SETUP-09]"]

@@ -2,6 +2,7 @@
 
 ## 0.5.0 - Unreleased
 
+- Report a skill that is in no skills folder as information, not a warning: clients with MCP Skills support, such as Claude Code (`/spec17:spec17`), load it from the spec17 server. It no longer shows a banner or a badge, or opens Settings on a first run.
 - Add a `.gitignore` to the installed skill folder so the on-disk copy stays out of git; it is not served as an MCP skill resource.
 - Start the requirement graph with requirements of the same ID prefix together in one block; linked requirements stay together, in the block of their most common prefix.
 - Colour the requirement graph by ID prefix, put graph labels closer to their own node, and open graphs sooner when most nodes are unlinked.

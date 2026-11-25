@@ -62,7 +62,7 @@ The first line shows how many units each rule skipped. If recent edits may be mi
 
 During a review, recommend the appropriate action for each candidate (read it with `codegraph_explore "<Name>"`):
 - **Business behaviour**: a rule, a computation, a saved or shown field, a user-visible flow or limit.
-  - Draft a requirement for the matching spec (next free ID, never a retired one) and show it to the user.
+  - Prefer rewording an existing requirement that owns this area, when its bullet stays small and about one rule. Draft a new one for the matching spec (next free ID, never a retired one) only for really new behaviour. Show the user the wording either way.
   - After they agree, test it with `[ID]` and cite `(ID)` at the code.
 - **Plumbing**: framework glue, layout, styling, wiring with no rule of its own, generic helpers, platform adapters. Ignore it. If a whole kind keeps showing up, raise `fanin` or add it to `infra_paths` instead of writing requirements for it.
 - **Belongs to an existing requirement**: add `(ID)` in a comment at the code; the spec already says it.

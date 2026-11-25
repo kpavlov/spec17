@@ -77,12 +77,12 @@ spec17 does not detect duplicate tests; a shared tag only makes two tests candid
 The spec is what the user agreed to; the code is only evidence of what exists. Never let the code quietly rewrite the spec. Resolve disagreements about intended behavior with the user before changing the spec.
 
 1. **Starting work.** `changes` (or `status changed=HEAD`) shows which requirements the current changes touch. `status missing=true prefix=X` lists due requirements in that area without test tags.
-2. **Behaviour change.** `trace` the requirement and read its spec and tests. Update the bullet to describe the requested behavior. Then change the tests, then the code with `(ID)` citations.
-3. **New requirement.** Draft the bullet in the matching spec (next free ID, never a retired one) using the agreed behavior. Then write the tests and cite `(ID)` at the code.
+2. **Behaviour change or addition.** Read the matching spec for the requirement that already owns the behaviour, and prefer updating it to creating one: when the bullet stays small and about one rule, keep its ID. `trace` it and read its tests. Update the bullet to describe the requested behavior. Then change the tests, then the code with `(ID)` citations.
+3. **New requirement.** Only for a really new one: no requirement owns the behaviour, or adding it would make a bullet long or give it a second rule. Draft the bullet in the matching spec (next free ID, never a retired one) using the agreed behavior. Then write the tests and cite `(ID)` at the code.
 4. **Writing a test.** Name the requirement it proves, in square brackets:
    - In the title: `@Test("[ABC-12] what holds")`, or the framework's own name. Write one test per behaviour. Use `[ABC-12][ABC-14]` only when one assertion set really proves both.
    - In the body: `// [ABC-13] why this proves it` beside an assertion that proves a *different* requirement, or above a helper that exists for one. A bare `(ABC-12)` in a test is not read.
-   - If no ID fits, the behaviour is unspecified: write the requirement first. Never borrow a nearby ID.
+   - If no ID fits, the behaviour is unspecified: specify it first (step 2 or 3). Never borrow a nearby ID.
    - Afterwards, `status changed=HEAD` should list the requirement as `tested` with `[changed: test]`.
 5. **After code or tests changed** (yours or the user's):
    - Run `changes`, and use the diff to spot missed or misleading links.
