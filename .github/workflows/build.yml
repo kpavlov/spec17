@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths-ignore:
       - Formula/**
+      - CHANGELOG.md
+      - README.md
   pull_request:
     # code, specs (the dogfood scan reads them) and build inputs only; not docs, README, Formula, bench
     paths:

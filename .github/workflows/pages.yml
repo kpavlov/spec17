@@ -16,11 +16,12 @@ concurrency:
 env:
   HUGO_VERSION: 0.170.1 # keep in step with the local Hugo (make docs)
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      PAGES_ARTIFACT_NAME: github-pages-${{ github.run_attempt }}
+    outputs:
+      artifact_name: ${{ env.PAGES_ARTIFACT_NAME }}
     steps:
       - uses: actions/checkout@v7
       - name: Install Hugo
@@ -32,6 +33,18 @@ jobs:
       - run: hugo --source docs --gc --minify --panicOnWarning --baseURL "${{ steps.pages.outputs.base_url }}/"
       - uses: actions/upload-pages-artifact@v5
         with:
+          name: ${{ env.PAGES_ARTIFACT_NAME }}
           path: docs/public
+
+  deploy:
+    # Let the artifact become visible before deploy-pages looks it up (actions/deploy-pages#451).
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v5
+        with:
+          artifact_name: ${{ needs.build.outputs.artifact_name }}
