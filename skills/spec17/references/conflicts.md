@@ -4,7 +4,7 @@ Read this before you classify an `overlap` pair, call two requirements conflicti
 
 ## overlap: code several requirements cover
 
-`overlap` lists declarations (method, function, type, property) that two or more requirements cover, from the CodeGraph index. A requirement covers a declaration when its ID is cited in a comment inside it or in the doc comment right above it. Each pair of IDs is marked:
+`overlap` lists declarations (method, function, type, property) that two or more requirements cover, from the CodeGraph index. A requirement covers a declaration when its ID is cited in a comment inside it. A `///` citation instead attaches to the next indexed declaration starting within eight lines. Each pair of IDs is marked:
 - `linked`: one spec's text cites the other, or both cite a third ID. The specs know each other, so they are probably complementary.
 - `UNLINKED`: no declared relation. Read these first; the specs may conflict, repeat each other, or share code only by accident.
 
@@ -23,10 +23,7 @@ Treat the actions below as proposals during a review. For each `UNLINKED` pair, 
 
 ## Conflict review
 
-An `UNLINKED` pair is a candidate, not a finding: two IDs on one declaration only prove that someone cited both. When the user asks which requirements conflict, or before you call a pair `conflicting`, do not answer from the tool output or the spec texts alone.
-
-The review needs strong enough model. If you are not that model and cannot hand the review to it, report the pair as an unverified candidate.
-For each pair within scope:
+For each pair in scope, check whether both rules can hold for the same input. If source, callers or tests are unavailable, identify the missing evidence and report the pair as unclear.
 
 1. **Understand the current code first.** Read:
    - the declaration, its callers and its callees. The CodeGraph MCP server provides `codegraph_explore` (spec17 setup option `server=codegraph`). If the tool is unavailable, read the declaration and follow the calls in source;
@@ -49,14 +46,14 @@ Report one table: declaration, IDs, verdict, one line of evidence. Quote both bu
 
 ## uncovered: code with no requirement
 
-`uncovered` reads the CodeGraph index and lists top-level types and functions in the source folders that no requirement covers. They are grouped by file and sorted by size, as `Name:first-last` line ranges. These are candidates for a **missing requirement**, not proof.
+`uncovered` reads the CodeGraph index and lists top-level types and functions under the first configured source folder (`src[0]`, or the repo when empty or `.`) with no detected requirement link. Files are sorted by total uncovered lines, with units in source order, as `Name:first-last` line ranges. These are candidates for a **missing requirement**, not proof.
 
 A unit is listed only if all of this holds, so shared plumbing does not drown the result:
-- No spec ID is cited in a comment inside it or just above it.
+- No spec ID is cited in a comment inside it or within the four lines above it.
 - No test tagged `[ID]` names it in its body.
 - No code that cites an ID uses it directly (one hop: calls, instantiates, references). A helper of a covered feature counts as covered.
 - It is not shared infrastructure: it is used from fewer than `fanin` other files (default 5) and is not under the `infra_paths` of `spec17.json`.
-- It is `internal` or `public` and at least `min` lines long (default 10).
+- Its indexed visibility is anything other than `private` or `fileprivate`, and it is at least `min` lines long (default 10).
 
 The first line shows how many units each rule skipped. If recent edits may be missing, check index freshness with `doctor`. Sync only on request.
 
@@ -64,5 +61,5 @@ During a review, recommend the appropriate action for each candidate (read it wi
 - **Business behaviour**: a rule, a computation, a saved or shown field, a user-visible flow or limit.
   - Prefer rewording an existing requirement that owns this area, when its bullet stays small and about one rule. Draft a new one for the matching spec (next free ID, never a retired one) only for really new behaviour. Show the user the wording either way.
   - After they agree, test it with `[ID]` and cite `(ID)` at the code.
-- **Plumbing**: framework glue, layout, styling, wiring with no rule of its own, generic helpers, platform adapters. Ignore it. If a whole kind keeps showing up, raise `fanin` or add it to `infra_paths` instead of writing requirements for it.
+- **Plumbing**: framework glue, layout, styling, wiring with no rule of its own, generic helpers, platform adapters. Ignore it. For example, a helper used by three distinct other files can appear at the default threshold of five. Running `spec17 uncovered --fanin 3` excludes it and every other unit used by at least three other files. To exclude only a known infrastructure folder, propose its path prefix for `infra_paths`.
 - **Belongs to an existing requirement**: add `(ID)` in a comment at the code; the spec already says it.

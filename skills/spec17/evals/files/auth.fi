@@ -1,0 +1,32 @@
+blob
+mark :1
+data 77
+- **AUTH-07** MUST expire a session after 900 seconds of inactivity. (later)
+
+blob
+mark :2
+data 72
+def active(idle_seconds):
+    # (AUTH-07)
+    return idle_seconds < 900
+
+blob
+mark :3
+data 88
+from src.auth import active
+
+def test_login():
+    """[AUTH-07]"""
+    assert active(0)
+
+reset refs/heads/main
+commit refs/heads/main
+mark :4
+author fixture <fixture@example.invalid> 1795600800 +0200
+committer fixture <fixture@example.invalid> 1795600800 +0200
+data 9
+baseline
+M 100644 :1 specs/auth.md
+M 100644 :2 src/auth.py
+M 100644 :3 tests/test_auth.py
+

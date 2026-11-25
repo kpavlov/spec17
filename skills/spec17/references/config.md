@@ -19,37 +19,43 @@ A test links to a requirement by tagging its title with `[ABC-12]`. Source comme
 
 None of this needs configuration in the usual layouts.
 
-**Specs folders.** Every folder that holds markdown is found:
-- `specs/`, `spec/`, `docs/specs/`, `.kiro/specs/`, `docs/superpowers/specs/`, and a `docs/` holding requirement lines.
+**Specs folders.** Recognized layouts include:
+- `specs/`, `spec/`, `docs/specs/`, `.kiro/specs/`, `docs/superpowers/specs/`, and dedicated folders such as `requirements/` or `.specify/specs/`. Generic `docs/` or `doc/` is a fallback when dedicated folders contain no requirement lines.
 - `openspec/specs/` and each `openspec/changes/*/specs/` (but not `archive/`). In OpenSpec:
   - requirements under a `## REMOVED` heading are retired;
   - a change's version of a requirement replaces the base one;
   - a `### Requirement` without an ID is a spec issue.
 
-**Source and test folders and extensions** are those of the dominant language. They are read from the CodeGraph index when there is one.
+**Source and test folders and extensions** are those of the dominant language. Detection uses the index file list when readable and falls back to a repository walk.
 
-**Profiles.** Each file is read with the built-in profile of its own language: `swift`, `rust`, `typescript` (also JavaScript), `svelte`, `python`, `go`, `jvm` (Java, Kotlin, Scala), `csharp`, `ruby`, `php`, `c/c++`, `dart`, `lua`, `r`, `objective-c`, `solidity`, `erlang`, `vb.net`, `pascal`, `sql`. A profile holds the comment markers and the declaration, assertion, switched-off, test-path and test-case regexes. A file of no known language is read like the dominant one.
+**Profiles.** Each file is read with the built-in profile of its own language: `swift`, `rust`, `typescript` (also JavaScript), `svelte`, `python`, `go`, `jvm` (Java, Kotlin, Scala), `csharp`, `ruby`, `php`, `c/c++`, `dart`, `lua`, `r`, `objective-c`, `solidity`, `erlang`, `vb.net`, `pascal`, `sql`. A profile holds the comment markers and the declaration, assertion, switched-off, test-path and test-case regexes. For scanned extensions without a profile, the scanner falls back to the dominant profile when available.
 
 **Symlinks** count only inside the repo root or `ALLOWED_PATHS`.
 
 ## spec17.json
 
-Put it, optionally, at the repo root. Fields:
-- `specs`, `tests`, `src`, `ext`
-- `profiles`
-- `retired_prefixes`
-- `codegraph`
-- `infra_paths`
+If parsing fails, inspect the reported line and column for JSON syntax errors such as a trailing comma. For a type error such as `"tests":"tests"`, keep the path and use the required array, `"tests":["tests"]`. A legacy top-level `test_files` regex belongs under the matching language entry as `profiles[].test`.
 
-Rules:
-- A field you set replaces its detected value.
-- For a second known language, list its extension in `ext`, and its folders in `src`/`tests`.
-- An unknown field is an error. So are the old top-level `comment`, `decl`, `assert`, `off`, `case` and `test_files`.
+At the repo root, set only the fields that need an override. For example, if Rust tests live exclusively under `tests/`, use `{"tests":["tests"]}`, then rerun `spec17 doctor` and trace a known ID.
 
-`profiles` is a list of entries with the fields `name`, `ext`, `comment`, `decl`, `assert`, `off`, `test`, `inline`, `case` and `call`.
-- An entry named like a built-in profile changes only the fields it sets, as in `{"name": "rust", "assert": "assert!|panic!"}`.
-- Any other name adds a language; the regexes it leaves out match nothing.
-- `case` is a regex matching a test marker, declaration or call. It replaces the built-in pattern, so include every form to keep. For example, Swift's is `^\\s*@Test\\b|^\\s*func\\s+(?:test\\w*|`test[^`]*`)`.
-- `call: true` takes the test name from the quoted string in a matched call such as `it("name", ...)`.
-- `inline: true` includes source folders when finding tests, as for Rust's inline tests.
-- `decl`, `assert`, `off`, `test` and `case` each accept a regex string or an ordered array of regex strings. The first pattern that matches wins. Each `decl` pattern needs capture group 1 for the name. A configured array replaces that field's built-in patterns.
+| Field | Value and effect |
+|---|---|
+| `specs` | String naming a spec folder or one Markdown file, relative to the repo root. A nonempty value replaces spec discovery. |
+| `src`, `tests`, `ext` | Arrays of source folders, test folders and extensions without dots. A nonempty list replaces detection for that field. Include both languages' paths and extensions in a mixed repo. |
+| `profiles` | Language overrides or additions, described below. Unknown profile fields are errors. At the top level, the legacy keys `comment`, `decl`, `assert`, `off`, `case` and `test_files` are rejected; other unrecognized keys are ignored. |
+| `priority`, `effort` | Ordered arrays of regexes for requirement text. A nonempty list replaces the defaults. The first nonempty capture group 1, in pattern order, supplies the value. |
+| `retired_prefixes` | Array of strings naming extra prefixes to check for dangling citations even after their requirements disappear. |
+| `codegraph` | Index path, default `.codegraph/codegraph.db`. |
+| `infra_paths` | Array of path prefixes under the first source folder to exclude from uncovered-code candidates. |
+
+Each entry in `profiles` requires a string `name`. A built-in name overrides only the supplied fields. A new name adds a profile ahead of the built-ins, so it can claim a shared extension. For example, `{"name":"rust","assert":"assert!|panic!"}` replaces the Rust assertion pattern.
+
+| Profile field | Type and behavior |
+|---|---|
+| `ext`, `comment` | Arrays of strings for extensions without dots and literal comment markers. |
+| `decl`, `assert`, `off`, `test`, `case`, `annotation` | Regexes for declarations, assertions, disabled tests, test-file paths, test-case starts, and annotations attached to the following declaration. Each declaration pattern must capture the name in group 1. |
+| `inline`, `call`, `lifetimes` | Booleans. Include source folders in detected test folders, take the test name from a quoted call, or recognize Rust-style lifetimes, respectively. |
+| `block_indent` | Boolean. End the test body by indentation. This mode excludes all four block regex fields below. |
+| `block_open`, `block_close`, `block_end`, `block_fence` | Regexes for nested delimiters (supply open and close together), a terminating line, or a quoted fence such as a SQL dollar tag. Without a block rule, the scanner uses braces. |
+
+A profile regex field accepts a string or an array of strings. Supplying either replaces that field’s inherited patterns. Swift’s built-in `case` recognizes `@Test` and `func test…`, including annotation prefixes. Preserve those forms when overriding it. When both `src` and `tests` are explicitly set, built-in test-path matching is disabled unless the profile override explicitly supplies `test`.

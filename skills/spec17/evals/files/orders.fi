@@ -1,0 +1,147 @@
+blob
+mark :1
+data 169
+# Inventory
+
+- **INV-04** MUST NOT reserve more units of a product than are in stock.
+- **INV-09** MUST refuse a reservation whose quantity exceeds the available stock.
+
+blob
+mark :2
+data 174
+# Orders
+
+- **ORD-12** MUST round the order total half-up to 2 decimal places.
+- **ORD-31** MUST round the order total down to whole currency units for display and charging.
+
+blob
+mark :3
+data 151
+# Payments
+
+- **PAY-03** MUST reject a card payment when the card has expired.
+- **PAY-08** MUST log every rejected payment with its rejection reason.
+
+blob
+mark :4
+data 164
+# Refunds
+
+- **REF-06** MUST refund to the original payment method. (later)
+- **REF-09** MUST email the customer when a refund completes, within 5 minutes. (later)
+
+blob
+mark :5
+data 189
+def reserve(stock: dict, product: str, qty: int) -> None:
+    # (INV-04) (INV-09)
+    if qty > stock.get(product, 0):
+        raise ValueError("not enough stock")
+    stock[product] -= qty
+
+blob
+mark :6
+data 238
+from decimal import Decimal, ROUND_HALF_UP
+
+
+def order_total(lines):
+    # (ORD-12) (ORD-31)
+    total = sum((Decimal(price) * qty for price, qty in lines), Decimal("0"))
+    return total.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+blob
+mark :7
+data 278
+import logging
+from datetime import date
+
+log = logging.getLogger("payments")
+
+
+def authorize(card_expiry: date, today: date) -> bool:
+    # (PAY-03) (PAY-08)
+    if card_expiry < today:
+        log.warning("payment rejected: card expired")
+        return False
+    return True
+
+blob
+mark :8
+data 428
+import logging
+
+log = logging.getLogger("refunds")
+
+
+def refund(payment: dict, amount):
+    # (REF-06)
+    result = {"method": payment["method"], "account": payment["account"], "amount": amount}
+    notify_customer(payment["customer"], amount)
+    return result
+
+
+def notify_customer(customer: str, amount) -> None:
+    # (REF-09) TODO: send the email; for now only log it.
+    log.info("refund of %s for %s", amount, customer)
+
+blob
+mark :9
+data 1064
+from decimal import Decimal
+
+from src.inventory import reserve
+from src.orders import order_total
+from src.payments import authorize
+from src.refunds import refund
+from datetime import date
+import pytest
+
+
+def test_total_rounds_half_up():
+    """[ORD-12]"""
+    assert order_total([("10.005", 1)]) == Decimal("10.01")
+
+
+def test_expired_card_is_rejected():
+    """[PAY-03]"""
+    assert not authorize(date(2020, 1, 1), date(2026, 1, 1))
+
+
+def test_reserve_more_than_stock_fails():
+    """[INV-04]"""
+    stock = {"apple": 2}
+    with pytest.raises(ValueError):
+        reserve(stock, "apple", 3)
+    assert stock == {"apple": 2}
+
+
+def test_refund_goes_to_original_method():
+    """[REF-06]"""
+    payment = {"method": "card", "account": "4111-xx", "customer": "ann"}
+    r = refund(payment, Decimal("5"))
+    assert r["method"] == "card" and r["account"] == "4111-xx"
+
+
+def test_refund_returns_amount():
+    """[REF-09]"""
+    payment = {"method": "card", "account": "4111-xx", "customer": "ann"}
+    assert refund(payment, Decimal("5"))["amount"] == Decimal("5")
+
+reset refs/heads/main
+commit refs/heads/main
+mark :10
+author fixture <fixture@example.invalid> 1795600800 +0200
+committer fixture <fixture@example.invalid> 1795600800 +0200
+data 9
+baseline
+M 100644 :1 specs/inventory.md
+M 100644 :2 specs/orders.md
+M 100644 :3 specs/payments.md
+M 100644 :4 specs/refunds.md
+M 100644 :5 src/inventory.py
+M 100644 :6 src/orders.py
+M 100644 :7 src/payments.py
+M 100644 :8 src/refunds.py
+M 100644 :9 tests/test_orders.py
+

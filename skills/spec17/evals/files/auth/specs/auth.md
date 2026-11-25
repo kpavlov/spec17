@@ -1,1 +1,0 @@
-- **AUTH-07** MUST expire a session after 900 seconds of inactivity. (later)

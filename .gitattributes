@@ -1,0 +1,2 @@
+# git fast-import counts bytes: CRLF conversion on checkout would corrupt the stream.
+*.fi -text

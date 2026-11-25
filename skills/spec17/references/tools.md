@@ -8,30 +8,44 @@ Read this when you need a tool's arguments, its CLI form, or how to read `status
 |---|---|---|
 | `report` | `limit` | `spec17 report [--limit N]` |
 | `status` | `spec`, `prefix`, `all`, `missing`, `changed` (git ref), `staged`, `include_untracked`, `ignore_whitespace`, `built`, `done`, `unproven`, `issues`, `effort`, `limit` | `spec17 status [flags]` |
-| `changes` | `ref`, `commit`, `staged`, `include_untracked`, `ignore_whitespace`, `show_ignored`, `show_all` | `spec17 changes [--ref R] [--commit C] [--staged] [--no-untracked]`: the changed files (added, modified, deleted, renamed with `old_path`; staged, unstaged, both, untracked or committed) and the requirements the changed lines touch, with a note per file (bullet edited or removed, test tag added or changed, citation added or removed, or a changed source file a tagged test reaches in the CodeGraph index, which is weaker: nothing there was edited). Edits that only re-wrap or re-indent are not listed. `ref=main` shows everything on a branch since main; `commit=<sha>` explains one commit; `show_all` adds files spec17 does not scan |
+| `changes` | `ref`, `commit`, `staged`, `include_untracked`, `ignore_whitespace`, `show_ignored`, `show_all` | `spec17 changes [--ref R] [--commit C] [--staged] [--no-untracked]`: the changed files (added, modified, deleted, renamed with `old_path`; staged, unstaged, both, untracked or committed) and the requirements the changed lines touch, with a note per file (bullet edited or removed, test tag added or changed, citation added or removed, or a changed source file a tagged test reaches in the CodeGraph index, which is weaker: nothing there was edited). `ref=main` compares the current tree with main; `commit=<sha>` explains one commit; `show_all` adds files spec17 does not scan |
 | `diff` | `path` (a file `changes` lists) and the arguments of `changes` | `spec17 diff PATH`, like `git diff REF -- PATH`, with a line under each hunk naming the requirements it touches |
-| `history` | `base`, `head`, `limit` | `spec17 history`, like `git log BASE..HEAD` (base: main or master), newest first, plus how many files are uncommitted; explain one with `changes commit=<sha>` |
+| `history` | `base`, `head`, `limit`, `ignore_whitespace`, `show_ignored`, `show_all` | `spec17 history`, like `git log BASE..HEAD` (default base: main, master, origin/main or origin/master), newest first, plus how many files are uncommitted; explain one with `changes commit=<sha>` |
 | `commits` | none | MCP only: per requirement, the newest commit that touched its bullet (git blame of the spec file): who last changed it and when, not that it was reviewed |
 | `blame` | `path` (a scanned spec, test or source file), `lines` | MCP only: who last changed those lines |
 | `trace` | `id` | `spec17 trace ID [--codegraph]` |
 | `search_tests` | `module`, `state`, `query`, `requirement_id`, `changed` | MCP only: filter detected tests, including untagged ones. `requirement_id` matches a full tag ID case-insensitively |
-| `search_requirements` | `test_file`, `line`, `end_line` | MCP only: requirements tagged in a test file; with `line`, the nearest detected test starting at or before it; with `end_line`, also tests starting up to it |
+| `search_requirements` | `test_file`, `line`, `end_line` | MCP only: requirements tagged in a test file; with `line`, the nearest detected test starting at or before it; with `end_line`, also tests starting up to it (both are positive, 1-based, and the end must be at least the start) |
 | `search_modules` | `query`, `changed` | MCP only: filter modules, with counts and dependency data when available |
-| `overlap` | `path`, `all` | `spec17 overlap [PATH]` |
-| `uncovered` | `path`, `fanin`, `min` | `spec17 uncovered [PATH]` |
-| `file` | `name` (omit to list) | read `specs/NAME` |
+| `overlap` | `path`, `all` | `spec17 overlap [PATH] [--all]` |
+| `uncovered` | `path`, `fanin`, `min` | `spec17 uncovered [PATH] [--fanin N] [--min N]` |
+| `file` | `name` (omit to list) | read the repo-relative spec path returned by the scan |
 | `source` | `path` | read a scanned test or source file |
 | `dashboard` | `view` (e.g. `modules`, `changes`, `requirements/DOC-25`) | URL of the web dashboard |
 | `doctor` | none | `spec17 doctor`: repo setup, CodeGraph binary and index |
-| `codegraph` | `action` (init\|sync\|refresh) | `spec17 doctor --fix`: builds or refreshes the CodeGraph index. Writes files and is slow: only when the user asks |
+| `codegraph` | `action` (init\|sync\|refresh) | `init` requires a missing index; `sync` requires an existing one. `refresh` syncs an existing index when CodeGraph is on PATH, even if fresh. The CLI’s `spec17 doctor --fix` runs the action suggested by its checks. Index only on request |
 | `module` | `path`, `hidden` (true/false) | hides a module (adds its folder to `.spec17ignore`) or shows it again. Writes a file: only when the user asks |
 | `install_status` | none | whether the skill and MCP entry are installed here or globally |
-| `install` | `global`, `port`, `server` (`spec17` or `codegraph`) | `spec17 install [--global]`. Writes files: only when the user asks |
-| `uninstall` | `global`, `only` (`skill` or `mcp`), `server` | `spec17 uninstall [--global] [--only skill\|mcp]`. Writes files: only when the user asks |
+| `install` | `global`, `port`, `only`, `transport`, `server` (`spec17` or `codegraph`) | `spec17 install [--global] [--port N]` or project-only `spec17 install --codegraph`. Writes files: only when the user asks |
+| `uninstall` | `global`, `only` (`skill` or `mcp`), `transport`, `server` | `spec17 uninstall [--global] [--only skill\|mcp]`. Writes files: only when the user asks |
 
-CLI without a server: `spec17 [--root DIR] [--json] report|status|trace|changes|diff|history|overlap|uncovered`. Output is plain text, identical on every run for the same tree.
+CLI flags use hyphens (`ignore_whitespace=true` → `--ignore-whitespace`, `include_untracked=false` → `--no-untracked`). Use `spec17 <command> --help` for the installed version. MCP `status` defaults to 200 rows; CLI `status` has no row cap. CLI `status --overlap [PATH]` and `status --uncovered [PATH]` dispatch to the corresponding tool. For MCP setup, `transport=http|stdio` requires `only=mcp`. Use `server=codegraph` alone for the project CodeGraph entry (CLI removal: `spec17 uninstall --codegraph`).
+
+CLI without a server: `spec17 [--root DIR] [--json] report|status|trace|changes|diff|history|overlap|uncovered`. The default output is text. Add `--json` for structured data.
 
 Resources: `spec17://modules` gives the module structure (nearest build manifest; with a CodeGraph index also symbols per kind and module dependencies). `spec17://tests` gives the detected test cases per module and file, each with its `[ID]` tags. Tests are detected by marker (`#[test]`, `@Test`, `def test_`, `it(` …), not run: a listed test does not say it passes.
+
+### Reading a complete result
+
+- `status` truncates both the MCP text rows and the structured rows at `limit`. The text header reports how many matched before truncation. To retrieve every ID, keep the filters and raise the limit to that total, or use the uncapped CLI. There is no offset or next-page token.
+- `report` limits the text examples in each section (default 12). Keep the section count even when only some examples are printed. For every entry use the structured report or `spec17 --json report`.
+- `overlap` text displays up to 25 declarations and six pairs per declaration. `uncovered` text lists up to 30 files. For an exhaustive review use the structured tool result or the corresponding CLI command with `--json`, preserving the path and filters.
+
+### When only the CLI is available
+
+- To find tests for an ID, run `spec17 trace ABC-12`. To include untagged cases, search the detected test folders for the behavior or symbol and inspect the assertions.
+- For a test-file line range, read the enclosing tests and their tags. Trace each ID to recover its spec text. For module questions, inspect the nearest build manifest and the paths listed by `spec17 changes`.
+- For line history, use `git blame -L START,END -- PATH` on the spec bullet or source lines in question.
 
 ## Report sections
 
@@ -52,13 +66,13 @@ Resources: `spec17://modules` gives the module structure (nearest build manifest
 
 **Summary (no list flag):** one line per spec file, `tested/due`, then `src-only` (cited in source, no test), `none` (neither), and counts of `manual` and `later`, the latter with how many already have tests or code, e.g. `later: 15 (3 with tests/code)`. Consecutive IDs print as ranges (`DOC-01..05`). A `TOTAL` line closes it, followed by spec issues and a hint.
 
-**Requirement lists** print one line per requirement: `ID  state  spec-file:line  [flags]  first 100 characters`. Several flags together narrow the list (all must hold); `spec`/`prefix` narrow it further.
+**Requirement lists** print one line per requirement: `ID  state  spec-file:line  [flags]  requirement text`. Default `--effort low` shows the first 100 characters. `medium` adds test and citation locations and available graph links. `high` also prints the full text. These options control output detail. Several flags together narrow the list (all must hold); `spec` matches a substring of the spec path and `prefix=BILL` matches IDs starting with `BILL-`.
 
 | Flag | Lists |
 |---|---|
 | `all` | every requirement, in ID order |
 | `missing` | due requirements with no test: state `src-only` or `none`. `later`, `deferred` and `manual` ones are not due |
-| `changed` | requirements touched by the working tree against a git ref (default `HEAD`; staged, unstaged and untracked files count): `spec` = its bullet was edited, `test` = a test that tags it was edited, `src` = a source unit that cites it was edited (the whole file in a language without braces). `staged`, `include_untracked=false` and `ignore_whitespace` narrow it. "May be affected", not "changed for the better" |
+| `changed` | requirements touched by the working tree against a git ref (default `HEAD`; staged, unstaged and untracked files count): `spec` = its bullet was edited, `test` = a test that tags it was edited, `src` = a source unit that cites it was edited (the whole file in a language without braces). `staged=true` implies a comparison against HEAD when no ref is given. `include_untracked=false` and `ignore_whitespace=true` narrow the comparison. "May be affected", not "changed for the better" |
 | `built` | requirements marked `later`/`deferred` that already have a `[ID]` test or a source citation, flagged `[built?: N tests, M src]`. Evidence only |
 | `done` | requirements carrying a check mark (✅ ✔ ☑ ✳) outside struck text, each with `[DONE: verdict]`. A hint, not proof |
 | `unproven` | check-marked requirements whose verdict is `NO-TEST` or `NO-LINK` |

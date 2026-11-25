@@ -1,97 +1,82 @@
 ---
 name: spec17
 description: >
-   Trace requirement IDs across specs, tests, code, and diffs. Use for coverage gaps,
-   conflicting requirements, and interpreting spec17 reports or dashboard counts.
+   Trace written requirements to code, tests and diffs by ID (ABC-12) or behavior.
+   Use for requirement coverage gaps, duplicate tests for one rule, conflicting specs,
+   branch impact on requirements, and spec17 setup or reports. Skip standalone test
+   writing, Git merge conflicts and general requirements advice.
 license: See LICENSE in the github.com/kpavlov/spec17 repository
 metadata:
-   version: 0.4.0
+   version: 0.5.0
    author: Konstantin Pavlov
    tags: sdd, requirements, traceability, testing
 ---
 
 # Spec-driven with spec17
 
-spec17 scans a repo's specs (`- **ABC-12** MUST — text`), test tags (`[ABC-12]`) and source citations (`(ABC-12)`) and reports the links it detects. It is deterministic evidence, not truth.
+spec17 scans a repo's specs (`- **ABC-12** MUST — text`), test tags (`[ABC-12]`) and source citations (`(ABC-12)`) and reports the links it detects. Use these links to locate the evidence for the user’s question.
 
-## Start with the question
+## Choose the first call
+
+Use the row that answers the request. Calls below use MCP arguments. For example, `status missing=true prefix=BILL` is `spec17 status --missing --prefix BILL` on the CLI. See [tools and CLI flags](references/tools.md) for other mappings.
 
 | Question | First call | When to stop |
 |---|---|---|
 | What is the overall SDD status? | `report` | Summarize the scan and its gaps. |
-| Which due requirements lack test tags? | `status missing=true` with the requested scope | Return the detected IDs or count. |
+| Which due requirements lack test tags? | `status missing=true` with the requested scope | For a count, use the reported total of matching rows. For every ID, check that the list is complete. |
 | What does one requirement say and which locations link to it? | `trace id=ABC-12` | Return the text and recorded links. |
-| Which requirements does spec17 link to this change? | `changes` | Return the detected links. For actual behavioral impact, inspect the relevant diff. |
-| Which deferred requirements might already be built? | `status built=true` | Inspect the implementation and test assertions for each candidate before recommending a marker change. |
-| Does this behavior exist or have a test? | `trace id=ABC-12` if the ID is known | Inspect the code path for implementation, or what the test exercises and asserts for coverage. Cite the location that answers it. |
-| Do requirements conflict? Which code has no requirement? | `overlap` / `uncovered` | Read `references/conflicts.md` before classifying anything. |
+| Which requirements does spec17 link to this change? | `changes` (a branch: `changes ref=main`) | Return the detected links and the comparison base. For actual behavioral impact, read the diff (`diff path=…` with the same comparison base) against each touched requirement's text. Changed tests are not proof that new behavior is authorized. |
+| Which deferred requirements might already be built? (dashboard "later but built") | `status built=true` | Inspect the implementation and test assertions for each candidate before recommending a marker change. |
+| Does this behavior satisfy a written rule? | Known ID: `trace id=ABC-12`. Otherwise use `file` to list specs and read the one that covers the behavior. | Match the rule’s conditions to the code path and assertions. If ownership stays ambiguous, report the candidate rules and what would distinguish them. |
+| Do requirements conflict (dashboard "specs to compare")? Which code has no requirement? | `overlap` / `uncovered` | Follow the [conflict review and uncovered-code triage](references/conflicts.md). |
 | Are tests duplicated? | `trace` or `search_tests requirement_id=…` | See "Duplicate tests". |
 
 Reviews are read-only. Report findings and proposed fixes. On an edit request, apply changes within its scope and ask when the intended requirement is unclear.
 
-**Evidence rules.** They hold for every answer:
-- **Keep scan counts and ID lists intact,** and attribute them to spec17.
-- **Treat tags and citations as claims.** They can be missing or wrong. A tag says a test names the requirement, not that the test checks it. A listed test is not a passing test: a pass needs an observed test run.
-- **Settle open questions by behavior.** If a trace leaves a behavioral question open, search by behavior or symbol in the likely module and its tests, including untagged tests. Follow helpers only as needed, and report what remains uncertain.
-- **Reserve project-wide inspection for a requested audit.** Reuse results already in context for the same tree.
-- **Do not edit to make a report green.** Verify the evidence before changing a tag or marker. Never weaken MUST/SHOULD/MAY, add `(later)`, or delete a bullet to clear a report.
+## Decide how much evidence to collect
 
-## Exploring the project status
+| User asks for | Work to do | What to report |
+|---|---|---|
+| Scan or dashboard summary (low) | Use the scan for the requested scope. For a project report, include the headline, tally and each nonempty [report section](references/tools.md#report-sections). | Attribute the counts and IDs to spec17. Identify the most important gaps. |
+| Implementation or coverage (medium) | Read the requirement, the implementation path and the assertions. Search by behavior or symbol for relevant untagged tests. | Cite the lines that answer the question. For a whole requirement, distinguish implemented, missing and uncertain clauses from test coverage. |
+| Deep inspection (high) | Follow indirect calls and run relevant tests within scope. | Give the command, observed outcome and remaining uncertainty. |
 
-`report` prints a headline, a one-line problem tally, and one section per problem kind (an empty one says `none`):
+Honor the requested depth. The `status --effort` flag controls printed detail. A tag records a claim. A passing result requires an observed run. Reserve repo-wide inspection for an audit request.
 
-See [Report sections](references/tools.md#report-sections) for the meaning of each finding.
+## Examples
 
-1. Give the user the headline, the tally and every non-empty section. Then add your reading: the two or three problems that matter most, and why.
-2. For a follow-up, use the narrowest tool: `status`, `trace`, `overlap` or `uncovered`.
-   - The flags, states and verdicts are in `references/tools.md`.
-   - For each kind of gap, separate requirements with no test tag (`untested`, `unimplemented`) from code with no requirement link (`uncovered`). Neither one proves a test is absent.
-3. A scan summary stops at effort `low`. A pair under "specs to compare" is a candidate: never call it conflicting from the report.
+**“Do idle sessions actually expire when the spec says they should?”** The user has no ID. List the specs with `file`. Read the authentication spec using the returned path as its `name`, or search the spec text locally for “idle”, “inactivity” and “expire”. The matching bullet in this example is AUTH-07. It specifies 900 seconds of inactivity and carries a deferred marker. If no bullet matches, report the behavior as unspecified in the specs searched. For this repo, `status built=true` includes:
 
-## Assessing the real state: effort modes
+```text
+[built?: 1 tests, 1 src]  expire a session after 900 seconds of inactivity. (later)
+```
 
-Honor an explicit effort request. Otherwise use the depth the question calls for.
+Run `spec17 trace AUTH-07`, read the cited function and assertion, then search for other calls to `active`. A completed review for this repo reads:
 
-| Effort | Scope |
-|---|---|
-| `low` — scan results | Report detected IDs, counts or links directly. |
-| `medium` — implementation or coverage | Verify the requested case yourself. Inspect every clause only for a whole-requirement verdict. |
-| `high` — deep inspection | Within the requested scope, follow indirect calls where needed, check the assertions and run the relevant tests. Report results and any gaps. |
+> AUTH-07's predicate returns false at 900 seconds (line 3 of the fixture’s auth module). Its only caller here is a test that asserts the session is active at zero seconds (line 5 of its login test). I found no expiry-boundary assertion or production caller that expires a session. Keep the deferred marker until that path is verified. I inspected the tests without running them.
 
-Handle focused reviews directly. For an explicitly broad review, independent requirements can be assessed in parallel: give each assessor only its requirements and locations.
+**Which billing requirements lack test tags?** Run `status missing=true prefix=BILL`. If the response starts “first 200 of 237 listed”, the count is 237. For an ID inventory, repeat with the same filters and `limit=237`, or run `spec17 status --prefix BILL --missing`. Check that all 237 IDs were returned. If retrieval remains incomplete, report the number retrieved and the total. A row marked `src-only` means spec17 found a source citation and no test tag. To answer whether tests exercise the rule, inspect the billing tests.
 
-For a whole-requirement review, report implementation and test coverage separately. Identify which clauses the code implements, which are missing, and which remain uncertain. Cite the code and the assertions that exercise each clause. Say whether you observed a test run.
+**Dashboard counts.** “Specs to compare 3, later but built 2. Which are real problems?” Preserve the count of three declarations to compare and the two deferred IDs. A declaration can contain several pairs. For each pair, trace both requirements and apply the [conflict review](references/conflicts.md) to the shared declaration. For each deferred ID, inspect the code and assertions before proposing a marker change. Return one row per pair or ID with its verdict, evidence location and any missing evidence.
 
-For example, a session can expire at the specified timeout while the tagged test only checks login. Report the timeout implementation and the coverage gap separately. For a misleading done or deferred marker, explain which clauses justify changing it.
+**Branch impact.** “Review feature/x against main. REF-04 caps a refund at the remaining balance.” With feature/x checked out, run `changes ref=main`, then `diff path=… ref=main` for the changed source and tests. Follow affected callers. Report the base, detected IDs and any further IDs connected by behavior. For example: “With 200 remaining, REF-04 allows a request of 150. The new cap refunds 100 before fees. Decide whether to restore the balance-only limit or amend REF-04 and its tests.” Cite the changed lines for a real review.
 
 ## Duplicate tests
 
 spec17 does not detect duplicate tests; a shared tag only makes two tests candidates.
-1. List the tests for an ID with `trace id=ABC-12` or `search_tests requirement_id=ABC-12`. Find untagged neighbours with `search_tests query=…`.
+1. List the tests for an ID with `trace id=ABC-12` or `search_tests requirement_id=ABC-12`. Find untagged neighbours with `search_tests state=untagged query=…` (query matches the path or test name).
 2. Read each candidate's setup, inputs and assertions (`source`, `codegraph_explore`).
 3. Two tests are duplicates only when they exercise the same path with equivalent inputs and assert the same outcome. Report meaningful differences. If evidence is incomplete, identify what remains uncertain.
-4. Propose which test to keep, and merge or remove the other only after the user agrees.
+4. Propose which test to keep if both cover the same case. Merge or remove it only for an approved edit.
+
+For example, two inventory tests both tagged INV-04 can reject an oversized reservation. If one also checks that stock stayed unchanged, keep that assertion when proposing a merge.
 
 ## Specs first, specs in sync
 
-The spec is what the user agreed to; the code is only evidence of what exists. Never let the code quietly rewrite the spec. Resolve disagreements about intended behavior with the user before changing the spec.
-
-1. **Starting work.** `changes` (or `status changed=HEAD`) shows which requirements the current changes touch. `status missing=true prefix=X` lists due requirements in that area without test tags.
-2. **Behaviour change or addition.** Read the matching spec for the requirement that already owns the behaviour, and prefer updating it to creating one: when the bullet stays small and about one rule, keep its ID. `trace` it and read its tests. Update the bullet to describe the requested behavior. Then change the tests, then the code with `(ID)` citations.
-3. **New requirement.** Only for a really new one: no requirement owns the behaviour, or adding it would make a bullet long or give it a second rule. Draft the bullet in the matching spec (next free ID, never a retired one) using the agreed behavior. Then write the tests and cite `(ID)` at the code.
-4. **Writing a test.** Name the requirement it proves, in square brackets:
-   - In the title: `@Test("[ABC-12] what holds")`, or the framework's own name. Write one test per behaviour. Use `[ABC-12][ABC-14]` only when one assertion set really proves both.
-   - In the body: `// [ABC-13] why this proves it` beside an assertion that proves a *different* requirement, or above a helper that exists for one. A bare `(ABC-12)` in a test is not read.
-   - If no ID fits, the behaviour is unspecified: specify it first (step 2 or 3). Never borrow a nearby ID.
-   - Afterwards, `status changed=HEAD` should list the requirement as `tested` with `[changed: test]`.
-5. **After code or tests changed** (yours or the user's):
-   - Run `changes`, and use the diff to spot missed or misleading links.
-   - `trace` each affected requirement and read the code.
-   - If the requirement no longer says what the code does, show the user the text, what the code does now (`file:line`), and your proposed wording. Let them choose between updating the spec and fixing the code.
-6. **Before finishing.** `status changed=HEAD missing=true` and `status issues=true` show gaps to report within the requested scope. A requirement whose code changed must still say what the code does.
-7. **No specs yet.** `doctor` warns "no specs found". Offer to draft `specs/01-….md` from what the user tells you, and write it after they confirm. Never invent requirements from the code.
-
-Several requirements on one piece of code (`overlap`) and code with none (`uncovered`) are judgement calls: follow `references/conflicts.md`. For a visual overview, `dashboard` returns the web dashboard's URL.
+1. **Find the owner.** Use `changes` and the matching spec. Trace the existing ID and inspect its tests. Keep its ID if the updated bullet still states one rule. Where the diff and spec disagree, show the user the text, observed behavior, and decision needed.
+2. **Write the agreed behavior first.** Create an ID only for a distinct rule. Check the candidate against existing specs, struck bullets and OpenSpec REMOVED sections. Check deleted specs in Git history when relevant (`git log -S "ABC-12" -- <spec-path>`). Keep retired IDs reserved. In a new repo, start with a rule supplied by the user.
+3. **Update the tests, then the code.** Tag the test title with `[ABC-12]` in the framework’s supported form. Use multiple tags only if the assertions exercise each rule. A comment tag beside an assertion can identify another requirement it exercises. Use `(ABC-12)` in a source comment at the implementation. Keep requirement levels and markers faithful to the agreed behavior.
+4. **Verify.** Run the affected tests unless the user reserved that step. On failure, compare expected and actual behavior with the agreed rule, fix the mismatch within scope, and rerun. Check `changes` and `trace` on the final tree for missed or misleading links. Report the test command and outcome, any in-scope gaps from `status changed=HEAD missing=true` and `status issues=true`, and any unexecuted check.
 
 ## Limitations
 
@@ -99,23 +84,36 @@ Test-to-code links, `overlap` and `uncovered` depend on a readable CodeGraph ind
 
 ## Troubleshooting
 
+If `doctor` reports “no specs found”, check the root and detected layout. For first-time setup, write the agreed rule in a specs folder when requested, then run `status` to confirm detection.
+
 If `trace` returns an unknown-ID error, check the ID against the spec text. If the ID is present or expected tests are missing, run `doctor` to check the detected layout and consult `references/config.md` for supported formats.
 
 For an unchecked graph result, use `doctor` to inspect index availability and freshness. Run indexing or installation only when requested.
 
+**Configuration repair example.** A repo sets `"tests":"checks"` and startup reports that a sequence was expected. The field takes a list of folders. For a repair request, change just that value to `"tests":["checks"]`, run `spec17 --root DIR doctor` to verify detection, then repeat the original trace. For other fields or a parse location, consult [formats and configuration](references/config.md).
+
+If a command rejects an argument, check `spec17 --version` and `spec17 <command> --help`, or the connected MCP tool's input schema. Use the supported spelling and keep the requested comparison base and filters. If the installed version cannot express them, inspect that diff or scope directly and say which check you performed.
+
+If the spec17 MCP tools are missing or the server does not answer, try the CLI (`spec17 --version`). If the binary is missing too, say so and point the user to the setup steps below or https://spec17.dev/quickstart/; meanwhile answer from the spec, code and tests directly and mark the result as not from spec17.
+
 ## Prerequisites and calling
 
-**MCP (preferred).** Run `spec17` in the repo. It serves that repo and opens the dashboard; `spec17 serve --no-open` skips the dashboard, and `--root DIR` picks another repo. Then connect the client over streamable HTTP:
+The command and tool reference follows spec17 0.5.0. Check the installed version with `spec17 --version`.
+
+**First-time setup.** Check `spec17 --version`. On macOS with Homebrew, the install command is `brew install kpavlov/spec17/spec17`. Then run `spec17 --root DIR doctor` and confirm the repo path and detected spec, source and test locations. CLI queries work at this point.
+
+**Connect MCP.** Run `spec17` in the repo. It serves that repo and opens the dashboard; `spec17 serve --no-open` serves the dashboard without launching a browser, and `--root DIR` picks another repo. Then connect the client over streamable HTTP:
 
 ```json
 {"mcpServers": {"spec17": {"type": "http", "url": "http://127.0.0.1:7411/mcp"}}}
 ```
 
-If MCP is unavailable, try the CLI. Change client configuration only for a setup request.
+For a setup request, reconnect the client and call its spec17 `doctor` tool. Check that it reports the intended repository. If the port is occupied, start `spec17 serve --no-open --port 7412` on an available port and use that port in the client URL. If binding is denied, use the CLI in the same repo and report the connection error.
 
-**CLI (no server).** `spec17 [--root DIR] [--json] report|status|trace|changes|diff|history|overlap|uncovered`. Output is identical on every run for the same tree.
+**CLI (no server).** `spec17 [--root DIR] [--json] report|status|trace|changes|diff|history|overlap|uncovered`. The CLI reads the repo directly.
 
-**Reference files.** Read one when the task needs it:
-- `references/tools.md`: every tool's arguments and CLI form, `status`/`trace` output, states, verdicts, spec issues, and what is scanned.
-- `references/conflicts.md`: `overlap` classification, the conflict review, and `uncovered` triage.
-- `references/config.md`: requirement formats, detected layouts, and the optional repo config with its language profiles.
+**References**
+
+- [Tools and output](references/tools.md) lists arguments, CLI alternatives, report sections and scan states.
+- [Conflict review](references/conflicts.md) covers shared declarations and code with no requirement link.
+- [Formats and configuration](references/config.md) explains missing IDs, test discovery and layout overrides.

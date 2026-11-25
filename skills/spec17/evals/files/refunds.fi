@@ -1,0 +1,137 @@
+blob
+mark :1
+data 272
+# Refunds
+
+- **REF-04** MUST return the requested amount of a partial refund, up to the remaining refundable balance.
+- **REF-08** MUST deduct the processing fee once per order, from its first refund.
+- **REF-11** MUST show on the refund receipt the net amount paid back.
+
+blob
+mark :2
+data 604
+from decimal import Decimal
+
+FEE = Decimal("2.50")
+
+
+class RefundService:
+    def __init__(self, paid: Decimal):
+        self.remaining = paid
+        self.refunds = 0
+
+    def refund(self, requested: Decimal) -> Decimal:
+        # (REF-04)
+        amount = min(requested, self.remaining)
+        self.remaining -= amount
+        # (REF-08)
+        fee = FEE if self.refunds == 0 else Decimal("0")
+        self.refunds += 1
+        return max(amount - fee, Decimal("0"))
+
+
+def receipt(service: RefundService, requested: Decimal) -> str:
+    # (REF-11)
+    return f"Refunded: {service.refund(requested)}"
+
+blob
+mark :3
+data 617
+from decimal import Decimal
+
+from src.refunds import RefundService, receipt
+
+
+def test_partial_refund_up_to_balance():
+    """[REF-04]"""
+    s = RefundService(Decimal("300"))
+    assert s.refund(Decimal("150")) == Decimal("147.50")
+    assert s.refund(Decimal("500")) == Decimal("150")
+
+
+def test_fee_once_per_order():
+    """[REF-08]"""
+    s = RefundService(Decimal("50"))
+    assert s.refund(Decimal("10")) == Decimal("7.50")
+    assert s.refund(Decimal("10")) == Decimal("10")
+
+
+def test_receipt_shows_net():
+    """[REF-11]"""
+    assert receipt(RefundService(Decimal("50")), Decimal("10")) == "Refunded: 7.50"
+
+reset refs/heads/main
+commit refs/heads/main
+mark :4
+author fixture <fixture@example.invalid> 1795600800 +0200
+committer fixture <fixture@example.invalid> 1795600800 +0200
+data 9
+baseline
+M 100644 :1 specs/refunds.md
+M 100644 :2 src/refunds.py
+M 100644 :3 tests/test_refunds.py
+
+blob
+mark :5
+data 591
+from decimal import Decimal
+
+FEE = Decimal("2.50")
+CAP = Decimal("100")
+
+
+class RefundService:
+    def __init__(self, paid: Decimal):
+        self.remaining = paid
+        self.refunds = 0
+
+    def refund(self, requested: Decimal) -> Decimal:
+        # (REF-04)
+        amount = min(requested, self.remaining, CAP)
+        self.remaining -= amount
+        # (REF-08)
+        fee = FEE
+        self.refunds += 1
+        return max(amount - fee, Decimal("0"))
+
+
+def receipt(service: RefundService, requested: Decimal) -> str:
+    # (REF-11)
+    return f"Refunded: {service.refund(requested)}"
+
+blob
+mark :6
+data 616
+from decimal import Decimal
+
+from src.refunds import RefundService, receipt
+
+
+def test_partial_refund_up_to_balance():
+    """[REF-04]"""
+    s = RefundService(Decimal("300"))
+    assert s.refund(Decimal("150")) == Decimal("97.50")
+    assert s.refund(Decimal("500")) == Decimal("97.50")
+
+
+def test_fee_per_refund():
+    """[REF-08]"""
+    s = RefundService(Decimal("50"))
+    assert s.refund(Decimal("10")) == Decimal("7.50")
+    assert s.refund(Decimal("10")) == Decimal("7.50")
+
+
+def test_receipt_shows_net():
+    """[REF-11]"""
+    assert receipt(RefundService(Decimal("50")), Decimal("10")) == "Refunded: 7.50"
+
+commit refs/heads/feature/refund-limits
+mark :7
+author fixture <fixture@example.invalid> 1795600800 +0200
+committer fixture <fixture@example.invalid> 1795600800 +0200
+data 48
+cap partial refunds at 100, fee on every refund
+from :4
+M 100644 :5 src/refunds.py
+M 100644 :6 tests/test_refunds.py
+
