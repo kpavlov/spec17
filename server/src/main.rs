@@ -658,6 +658,8 @@ mod tests {
         }
         let unknown = call("skills/get", json!({"uri":"skill://missing/SKILL.md"})).await;
         assert_eq!(unknown["error"]["code"], -32602);
+        let unknown = call("resources/read", json!({"uri":"skill://spec17/.gitignore"})).await;
+        assert_eq!(unknown["error"]["code"], -32602, "the on-disk .gitignore is not a skill resource");
         let unknown = call("resources/read", json!({"uri":"skill://spec17/missing.md"})).await;
         assert_eq!(unknown["error"]["code"], -32602);
     }

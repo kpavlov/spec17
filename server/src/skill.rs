@@ -15,6 +15,8 @@ pub const FILES: [(&str, &str); 4] = [
     ("references/config.md", include_str!("../../skills/spec17/references/config.md")),
 ];
 pub const SKILL: &str = FILES[0].1;
+/// Written beside the skill on disk only, never listed in `FILES` (so never served as a skill resource): ignores the whole folder, itself included, so the installed copy stays out of git (SETUP-15).
+const GITIGNORE: (&str, &str) = (".gitignore", "*\n");
 
 /// `<repo>/.agents/skills` or `~/.agents/skills`.
 pub fn skills_dir(root: Option<&Path>, global: bool) -> Result<PathBuf, String> {
@@ -27,7 +29,7 @@ pub fn skills_dir(root: Option<&Path>, global: bool) -> Result<PathBuf, String> 
 
 pub fn install(dir: &Path) -> Result<PathBuf, String> {
     let d = dir.join(NAME);
-    for (path, text) in FILES {
+    for &(path, text) in FILES.iter().chain([&GITIGNORE]) {
         let f = d.join(path);
         let parent = f.parent().unwrap_or(&d);
         std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
@@ -41,7 +43,7 @@ pub fn uninstall(dir: &Path) -> Result<Option<PathBuf>, String> {
     let d = dir.join(NAME);
     let f = d.join("SKILL.md");
     let mut removed = false;
-    for (path, _) in FILES {
+    for &(path, _) in FILES.iter().chain([&GITIGNORE]) {
         let p = d.join(path);
         match std::fs::remove_file(&p) {
             Ok(()) => removed = true,
@@ -222,7 +224,7 @@ fn skill_state(dir: &Path) -> SkillState {
     if !d.join("SKILL.md").exists() {
         return SkillState::Missing;
     }
-    match FILES.iter().all(|(path, text)| std::fs::read_to_string(d.join(path)).is_ok_and(|t| t == *text)) {
+    match FILES.iter().chain([&GITIGNORE]).all(|(path, text)| std::fs::read_to_string(d.join(path)).is_ok_and(|t| t == *text)) {
         true => SkillState::Current,
         false => SkillState::Outdated,
     }
@@ -424,6 +426,22 @@ mod tests {
         assert_eq!(uninstall(&dir).unwrap(), Some(f.clone()));
         assert!(!f.exists() && !tools.exists() && !dir.join("spec17/references").exists() && dir.join("spec17/notes.txt").exists());
         assert_eq!(uninstall(&dir).unwrap(), None);
+    }
+
+    #[doc = "[SETUP-15]"]
+    #[test]
+    fn install_adds_a_gitignore_that_is_not_a_skill_file() {
+        let dir = tmp("gitignore-a");
+        install(&dir).unwrap();
+        let ignore = dir.join("spec17/.gitignore");
+        assert_eq!(std::fs::read_to_string(&ignore).unwrap(), "*\n");
+        assert!(!FILES.iter().any(|(p, _)| *p == ".gitignore"), "the .gitignore must not be served as a skill file");
+        std::fs::remove_file(&ignore).unwrap();
+        let repo = tmp("gitignore-b");
+        std::fs::create_dir_all(repo.join("specs")).unwrap();
+        apply(Some(&repo), false, Some(7411), Some(InstallPart::Skill), McpTransport::Http).unwrap();
+        std::fs::remove_file(repo.join(".agents/skills/spec17/.gitignore")).unwrap();
+        assert!(status(Some(&repo), 7411).unwrap().project.skill == SkillState::Outdated, "an install without the .gitignore is outdated");
     }
 
     #[doc = "[SETUP-03]"]

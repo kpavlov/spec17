@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.0 - Unreleased
+
+- Add a `.gitignore` to the installed skill folder so the on-disk copy stays out of git; it is not served as an MCP skill resource.
+
 ## 0.4.0
 
 - Keep agent reviews read-only and report separately what the code implements, what the tests assert, and which tests ran.
