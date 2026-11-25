@@ -46,23 +46,65 @@ export function components<T>(nodes: T[], edges: Edge<T>[]): T[][] {
   return groups;
 }
 
-// Repel clusters by their bounding circles without changing their internal layout.
-export function separate<T extends Point & { r: number }>(groups: T[][], gap = 60, prefix?: (node: T) => string): Map<T, Point> {
+// Repel clusters by their bounding circles without changing their internal layout. A linked cluster (two or more nodes) gets
+// `linkedMargin` more room around it; xPull and yPull draw the clusters to the middle.
+function pack<T extends Point & { r: number }>(groups: T[][], gap: number, linkedMargin = 0, xPull = 0.05, yPull = 0.05): Map<T, Point> {
   const clusters = groups.filter((group) => group.length).map((group) => {
     const x = (Math.min(...group.map((n) => n.x - n.r)) + Math.max(...group.map((n) => n.x + n.r))) / 2;
     const y = (Math.min(...group.map((n) => n.y - n.r)) + Math.max(...group.map((n) => n.y + n.r))) / 2;
-    const radius = Math.max(...group.map((n) => Math.hypot(n.x - x, n.y - y) + n.r)) + gap / 2 + (prefix && group.length > 1 ? gap : 0);
-    return { group, oldX: x, oldY: y, radius, x: NaN, y: NaN, prefixes: prefix ? [...new Set(group.map(prefix))] : [] };
+    const radius = Math.max(...group.map((n) => Math.hypot(n.x - x, n.y - y) + n.r)) + gap / 2 + (group.length > 1 ? linkedMargin : 0);
+    return { group, oldX: x, oldY: y, radius, x: NaN, y: NaN };
   });
   forceSimulation(clusters).force("repel", forceCollide<typeof clusters[number]>((c) => c.radius).strength(1).iterations(4))
-    .force("x", forceX(0).strength(prefix ? 0.015 : 0.05)).force("y", forceY(0).strength(prefix ? 0.09 : 0.05))
-    .force("prefix", prefix ? prefixForce((c) => c.prefixes) : null).stop().tick(300);
+    .force("x", forceX(0).strength(xPull)).force("y", forceY(0).strength(yPull)).stop().tick(300);
   const centers = new Map<T, Point>();
   for (const cluster of clusters) {
     const center = { x: cluster.x, y: cluster.y };
     for (const node of cluster.group) { node.x += cluster.x - cluster.oldX; node.y += cluster.y - cluster.oldY; centers.set(node, center); }
   }
   return centers;
+}
+
+const commonest = (keys: string[]): string => {
+  const count = new Map<string, number>();
+  for (const key of keys) count.set(key, (count.get(key) ?? 0) + 1);
+  return [...count].reduce((best, next) => (next[1] > best[1] ? next : best))[0]; // a tie goes to the first seen
+};
+
+// Space clusters apart and return each node's cluster center. (WEB-53) With a `prefix`, the clusters of one prefix are first
+// packed into a block, then whole blocks are spaced farther apart, so another prefix cannot land among them.
+export function separate<T extends Point & { r: number }>(groups: T[][], gap = 60, prefix?: (node: T) => string): Map<T, Point> {
+  if (!prefix) return pack(groups, gap);
+  const blocks = new Map<string, T[][]>();
+  for (const group of groups) {
+    if (!group.length) continue;
+    const key = commonest(group.map(prefix));
+    if (!blocks.has(key)) blocks.set(key, []);
+    blocks.get(key)!.push(group);
+  }
+  const packed = [...blocks.values()].map((block) => {
+    const inner = pack(block, gap * 0.4, gap * 0.4); // (WEB-50) linked clusters still stand apart, by less than blocks do
+    const nodes = block.flat();
+    return { inner, nodes, from: { x: nodes[0].x, y: nodes[0].y } };
+  });
+  pack(packed.map((block) => block.nodes), gap * 1.6, 0, 0.015, 0.09); // a wide band, like the canvas
+  const centers = new Map<T, Point>();
+  for (const { inner, nodes, from } of packed) {
+    const [dx, dy] = [nodes[0].x - from.x, nodes[0].y - from.y]; // a block moves as one body
+    for (const center of new Set(inner.values())) { center.x += dx; center.y += dy; }
+    for (const [node, center] of inner) centers.set(node, center);
+  }
+  return centers;
+}
+
+// (WEB-53) Where a node added after the first layout goes: on the peer nearest the middle of its peers (always a place inside
+// their block), or, for a group with no peers yet, `gap` to the right of everything placed.
+export function homeFor(peers: Point[], placed: Point[], gap: number): Point {
+  if (!peers.length) return { x: Math.max(0, ...placed.map((p) => p.x)) + gap, y: 0 };
+  const [mx, my] = [peers.reduce((sum, p) => sum + p.x, 0) / peers.length, peers.reduce((sum, p) => sum + p.y, 0) / peers.length];
+  const from = (p: Point) => Math.hypot(p.x - mx, p.y - my);
+  const { x, y } = peers.reduce((best, next) => (from(next) < from(best) ? next : best));
+  return { x, y };
 }
 
 function crosses(a: Point, b: Point, c: Point, d: Point): boolean {

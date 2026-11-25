@@ -160,7 +160,7 @@ fn setup(root: Option<&Path>, name: &str, args: &Value, mcp_port: u16) -> Option
         let st = skill::status(root, mcp_port)?;
         let mut text = changed.join("\n");
         let todo = skill::suggestions(&st);
-        text += &(if todo.is_empty() { "\ninstalled: the agent can use spec17 here".to_string() } else { format!("\n{}", todo.join("\n")) });
+        text += &(if todo.is_empty() { "\nready: the agent can use spec17 here".to_string() } else { format!("\n{}", todo.join("\n")) });
         // (WEB-42) Use the same version as the CLI for the Settings screen.
         Ok((text.trim_start().to_string() + "\n", json!({"status": st, "suggestions": todo, "version": crate::VERSION})))
     })())
