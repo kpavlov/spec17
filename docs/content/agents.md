@@ -7,7 +7,7 @@ Connect an AI coding assistant to spec17 using the Model Context Protocol (MCP).
 
 ## Install the skill and an MCP entry
 
-If your client reads `.mcp.json`, run `spec17 install` from the project root. It installs the skill in `.agents/skills/spec17/` and adds an HTTP entry to `.mcp.json`. It preserves other server entries and leaves files with invalid JSON untouched.
+If your client reads `.mcp.json`, run `spec17 install` from the project root. It installs the skill in `.agents/skills/spec17/`, with a `.gitignore` that keeps this copy out of Git, and adds an HTTP entry to `.mcp.json`. It preserves other server entries and leaves files with invalid JSON untouched.
 
 | Command | Effect |
 | --- | --- |
@@ -55,7 +55,7 @@ If your client supports MCP Apps, ask it to call the `dashboard` tool. Pass a `v
 
 ## Load the skill over MCP
 
-Clients that support the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview) can load the skill over either transport. The server exposes `skill://spec17/SKILL.md` and its references under `skill://spec17/references/`. Use `spec17 install` to make the skill available on disk.
+Clients that support the [MCP Skills extension](https://modelcontextprotocol.io/extensions/skills/overview) can load the skill over either transport. The server exposes `skill://spec17/SKILL.md` and its references under `skill://spec17/references/`. These clients, such as Claude Code (`/spec17:spec17`), don't need a copy on disk, so `spec17 doctor` reports a missing one as information. For other clients, `spec17 install` writes the copy.
 
 ## Tools
 

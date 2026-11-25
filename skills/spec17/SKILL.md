@@ -1,10 +1,9 @@
 ---
 name: spec17
 description: >
-   Trace written requirements to code, tests and diffs by ID (ABC-12) or behavior.
-   Use for requirement coverage gaps, duplicate tests for one rule, conflicting specs,
-   branch impact on requirements, and spec17 setup or reports. Skip standalone test
-   writing, Git merge conflicts and general requirements advice.
+   Use when tracing requirement IDs (ABC-12) to code, tests or diffs: coverage gaps,
+   duplicate tests, conflicting specs, branch impact, spec17 setup. Not for writing
+   standalone tests or Git merges.
 license: See LICENSE in the github.com/kpavlov/spec17 repository
 metadata:
    version: 0.5.0
@@ -14,9 +13,17 @@ metadata:
 
 # Spec-driven with spec17
 
+## Purpose
+
 spec17 scans a repo's specs (`- **ABC-12** MUST — text`), test tags (`[ABC-12]`) and source citations (`(ABC-12)`) and reports the links it detects. Use these links to locate the evidence for the user’s question.
 
-## Choose the first call
+## Instructions
+
+1. Pick the first call from the table below.
+2. Collect evidence at the depth the user asked for.
+3. Report what spec17 detected separately from what you verified.
+
+### Choose the first call
 
 Use the row that answers the request. Calls below use MCP arguments. For example, `status missing=true prefix=BILL` is `spec17 status --missing --prefix BILL` on the CLI. See [tools and CLI flags](references/tools.md) for other mappings.
 
@@ -33,7 +40,7 @@ Use the row that answers the request. Calls below use MCP arguments. For example
 
 Reviews are read-only. Report findings and proposed fixes. On an edit request, apply changes within its scope and ask when the intended requirement is unclear.
 
-## Decide how much evidence to collect
+### Decide how much evidence to collect
 
 | User asks for | Work to do | What to report |
 |---|---|---|
@@ -73,8 +80,8 @@ For example, two inventory tests both tagged INV-04 can reject an oversized rese
 
 ## Specs first, specs in sync
 
-1. **Find the owner.** Use `changes` and the matching spec. Trace the existing ID and inspect its tests. Keep its ID if the updated bullet still states one rule. Where the diff and spec disagree, show the user the text, observed behavior, and decision needed.
-2. **Write the agreed behavior first.** Create an ID only for a distinct rule. Check the candidate against existing specs, struck bullets and OpenSpec REMOVED sections. Check deleted specs in Git history when relevant (`git log -S "ABC-12" -- <spec-path>`). Keep retired IDs reserved. In a new repo, start with a rule supplied by the user.
+1. **Find the owner.** Use `changes` and the matching spec. Trace the existing ID and inspect its tests. Keep its ID if the updated bullet still states one rule. If changed code or tests no longer match the requirement, quote the current requirement, show what the code does now, and give the exact replacement wording you propose. Edit the requirement only after the user confirms that wording. Never silently rewrite it or weaken its level to fit the code.
+2. **Write or update the agreed requirement before changing tests or code.** Create an ID only for a distinct rule. Check the candidate against existing specs, struck bullets and OpenSpec REMOVED sections. Check deleted specs in Git history when relevant (`git log -S "ABC-12" -- <spec-path>`). Keep retired IDs reserved. In a new repo, start with a rule supplied by the user.
 3. **Update the tests, then the code.** Tag the test title with `[ABC-12]` in the framework’s supported form. Use multiple tags only if the assertions exercise each rule. A comment tag beside an assertion can identify another requirement it exercises. Use `(ABC-12)` in a source comment at the implementation. Keep requirement levels and markers faithful to the agreed behavior.
 4. **Verify.** Run the affected tests unless the user reserved that step. On failure, compare expected and actual behavior with the agreed rule, fix the mismatch within scope, and rerun. Check `changes` and `trace` on the final tree for missed or misleading links. Report the test command and outcome, any in-scope gaps from `status changed=HEAD missing=true` and `status issues=true`, and any unexecuted check.
 

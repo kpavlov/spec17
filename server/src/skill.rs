@@ -392,7 +392,7 @@ mod tests {
             assert!(tools.contains(&format!("| `{}` |", t.name)), "skills/spec17/references/tools.md does not list the `{}` tool", t.name);
         }
         for (path, _) in &FILES[1..] {
-            assert!(SKILL.contains(&format!("`{path}`")), "SKILL.md does not point to {path}");
+            assert!(SKILL.contains(&format!("]({path})")), "SKILL.md does not link to {path}");
         }
     }
 

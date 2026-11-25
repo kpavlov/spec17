@@ -46,7 +46,7 @@ Open **Tests** to browse detected test cases and their tags. In **Changes**, sel
 
 ![Detected tests and filters](../img/tests.png)
 
-To follow references between requirements, switch **Requirements** to **Graph**. Each arrow points to the referenced requirement. Highlighted rings and arrows mark circular references. Select a node to open its details.
+To follow references between requirements, switch **Requirements** to **Graph**. Each arrow points to the referenced requirement. Requirements are grouped and colored by ID prefix. Linked requirements stay together, in the group of their most common prefix. Highlighted rings and arrows mark circular references. Select a node to open its details.
 
 ![Requirements graph showing references and a highlighted cycle](../img/requirements-graph.png)
 
