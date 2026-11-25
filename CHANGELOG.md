@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0 - Unreleased
+## 0.5.0
 
 - Report a skill that is in no skills folder as information, not a warning: clients with MCP Skills support, such as Claude Code (`/spec17:spec17`), load it from the spec17 server. It no longer shows a banner or a badge, or opens Settings on a first run.
 - Add a `.gitignore` to the installed skill folder so the on-disk copy stays out of git; it is not served as an MCP skill resource.
