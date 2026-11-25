@@ -1479,7 +1479,7 @@ dependencies = [
 
 [[package]]
 name = "spec17"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "axum",
  "clap",
@@ -1501,7 +1501,7 @@ dependencies = [
 
 [[package]]
 name = "spec17-core"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "ignore",
  "indexmap",
