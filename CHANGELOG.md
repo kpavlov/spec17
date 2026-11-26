@@ -19,6 +19,11 @@
 - Never make a Dashboard or Changes block taller than its content: a dragged height is now a limit.
 - Say in Settings what CodeGraph is, with a link to its project, and link to the high-legibility font from the display settings.
 
+### Fixed
+
+- Marking or clearing a requirement as reviewed no longer overwrites marks saved from another tab.
+- Collapsing or expanding a table group no longer overwrites groups another tab saved.
+
 ## 0.5.0
 
 - Report a skill that is in no skills folder as information, not a warning: clients with MCP Skills support, such as Claude Code (`/spec17:spec17`), load it from the spec17 server. It no longer shows a banner or a badge, or opens Settings on a first run.

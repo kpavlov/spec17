@@ -25,6 +25,17 @@ export const run = <T>(store: string, mode: IDBTransactionMode, f: (s: IDBObject
     };
   });
 
+/** Replaces the record at `key` with `edit` of the stored one, in one transaction: a tab's own copy never goes over what another tab saved. */
+export async function update<T>(store: string, key: string, edit: (old: T | undefined) => T): Promise<T> {
+  let next!: T;
+  await run<T | undefined>(store, "readwrite", (s) => {
+    const get = s.get(key);
+    get.onsuccess = () => s.put((next = edit(get.result)), key);
+    return get;
+  });
+  return next;
+}
+
 /** (WEB-72) Deletes the whole database, every root's records: call it only once the user has agreed. */
 export const deleteDb = (blocked: () => void) =>
   new Promise<void>((ok, no) => {

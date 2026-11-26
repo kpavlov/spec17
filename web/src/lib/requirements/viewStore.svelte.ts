@@ -1,5 +1,5 @@
 // (WEB-71, WEB-52) saved views, one record per repo in IndexedDB. Where storage is blocked they last for the session.
-import { db, run } from "$lib/db.svelte";
+import { db, run, update } from "$lib/db.svelte";
 import { nav, navigate } from "$lib/nav.svelte";
 import { putView, viewQuery, VIEW_KEYS, type SavedView } from "$lib/requirements/views";
 
@@ -9,16 +9,9 @@ type Edit = (list: SavedView[]) => SavedView[];
 // edits made before the root was known: stored once it is
 const early: Edit[] = [];
 
-// the edit is applied to the stored list in one transaction, never this tab's copy over it: another tab may have saved since
+// the edit goes onto the stored list, not this tab's copy over it: another tab may have saved since
 async function write(root: string, edit: Edit) {
-  try {
-    const before = await run<SavedView[] | undefined>("views", "readwrite", (s) => {
-      const get = s.get(root);
-      get.onsuccess = () => s.put(edit(get.result ?? []), root);
-      return get;
-    });
-    saved.list = edit(before ?? []);
-  } catch { /* storage blocked */ }
+  try { saved.list = await update<SavedView[]>("views", root, (list) => edit(list ?? [])); } catch { /* storage blocked */ }
 }
 function change(edit: Edit) {
   saved.list = edit(saved.list); // at once, also without storage
