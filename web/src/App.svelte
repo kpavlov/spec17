@@ -142,13 +142,15 @@
     if (route.tab === "uncovered") fetchOnce("uncovered", () => call("uncovered").then((r) => void (data.uncovered = r.data)));
   });
 
+  // a slower answer for an earlier scope (or load) must not replace a newer one
+  let changesReq = 0;
   $effect(() => {
     if (route.tab !== "changes") return;
     void data.gen;
-    const scope = data.scope;
-    call("history", { ignore_whitespace: scope.ignore_whitespace, show_ignored: scope.show_ignored, show_all: scope.show_all }).then((r) => (data.history = r.data)).catch(() => (data.history = null));
+    const scope = data.scope, n = ++changesReq;
+    call("history", { ignore_whitespace: scope.ignore_whitespace, show_ignored: scope.show_ignored, show_all: scope.show_all }).then((r) => { if (n === changesReq) data.history = r.data; }).catch(() => { if (n === changesReq) data.history = null; });
     if (data.defaultScope) return;
-    call("changes", scope).then((r) => (data.custom = r.data)).catch(() => (data.custom = null));
+    call("changes", scope).then((r) => { if (n === changesReq) data.custom = r.data; }).catch(() => { if (n === changesReq) data.custom = null; });
   });
 
   // scroll to what the URL points at once it is rendered (the lists scroll their own selection: DataTable)

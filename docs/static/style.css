@@ -69,6 +69,16 @@ footer { padding: 14px 16px; text-align: center; font-size: var(--text-sm); line
 footer a { color: inherit; }
 footer .contact { color: var(--accent); font-weight: var(--weight-semibold); }
 footer a:hover { color: var(--accent-2); }
+#cookie-settings { padding: 0; font: inherit; color: inherit; text-decoration: underline; background: none; border: 0; cursor: pointer; }
+#cookie-settings:hover { color: var(--accent-2); }
+/* (NFR-20) consent banner: not modal; both choices share one style */
+#consent { position: fixed; z-index: 10; left: .75rem; right: .75rem; bottom: .75rem; max-width: 42rem; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: .25rem 1rem; padding: .6rem .9rem; font-size: var(--text-sm); background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius); box-shadow: var(--shadow); }
+#consent[hidden] { display: none; }
+#consent p { flex: 1 1 16rem; margin: 0; }
+#consent div { display: flex; gap: .5rem; }
+#consent button { min-width: 6rem; font: inherit; color: var(--fg); background: var(--btn-bg); border: 1px solid var(--line-strong); border-radius: var(--radius); padding: var(--btn-pad); cursor: pointer; }
+#consent button:hover { background: var(--btn-bg-hover); color: var(--btn-fg-hover); }
+body:has(#consent:not([hidden])) { padding-bottom: 9rem; } /* the end of the page stays reachable under the banner */
 
 code, pre { font: .875em var(--mono); background: var(--raised); border-radius: var(--radius); }
 kbd { font-family: var(--mono); }
