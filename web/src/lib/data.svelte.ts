@@ -79,7 +79,8 @@ export const blameKey = (file: string, line: number) => `${data.gen}:${file}:${l
 export const wantBlame = (refs: { file: string; line: number }[]) => {
   const by = new Map<string, number[]>();
   for (const r of refs) if (!(blameKey(r.file, r.line) in data.blame)) by.set(r.file, [...(by.get(r.file) ?? []), r.line]);
-  for (const [path, lines] of by) call("blame", { path, lines }).then((b) => { for (const [n, c] of Object.entries<any>(b.data.lines)) data.blame[blameKey(path, +n)] = c; }).catch(() => {});
+  const gen = data.gen; // an answer that lands after a reload is dropped: keyed anew it would pass for fresh
+  for (const [path, lines] of by) call("blame", { path, lines }).then((b) => { if (gen === data.gen) for (const [n, c] of Object.entries<any>(b.data.lines)) data.blame[blameKey(path, +n)] = c; }).catch(() => {});
 };
 
 export const guard = <T,>(p: Promise<T>) => p.catch((e) => { data.error = String(e.message ?? e); throw e; });
@@ -95,6 +96,8 @@ export function requirementText(id: string): Promise<string> {
 }
 
 let loadId = 0;
+/** How many loads have started. */
+export const loadCount = () => loadId;
 export async function load() {
   data.error = "";
   const me = ++loadId;
@@ -105,9 +108,10 @@ export async function load() {
   requirementDetails = new Map();
   data.up = true;
   // the modules views are optional: a failed resource read leaves them empty instead of failing the load
-  read("spec17://modules").then((m) => (data.modules = m)).catch(() => (data.modules = null));
-  call("changes").then((c) => (data.changes = c.data)).catch(() => (data.changes = null));
-  call("commits").then((c) => (data.commits = c.data.commits)).catch(() => (data.commits = {}));
+  const latest = <T,>(set: (v: T) => void) => (v: T) => { if (me === loadId) set(v); };
+  read("spec17://modules").then(latest((m) => (data.modules = m))).catch(latest(() => (data.modules = null)));
+  call("changes").then(latest((c) => (data.changes = c.data))).catch(latest(() => (data.changes = null)));
+  call("commits").then(latest((c) => (data.commits = c.data.commits))).catch(latest(() => (data.commits = {})));
   data.gen++;
   data.loadedAt = Date.now();
   // asked on every load, as the branch may have changed; the reviewed marks are read once, for the root

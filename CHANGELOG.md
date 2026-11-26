@@ -23,6 +23,10 @@
 
 ### Fixed
 
+- Dashboard: a late or failed answer no longer replaces a newer one (open requirement, source preview, blame, changes, commits and modules; saved views changed while storage was still answering).
+- "Open in" links of the VS Code family and Zed now work for paths containing `#`, `?` or `%`.
+- Test filter chips no longer break for a module named `tagged`, `untagged` or `changed`.
+- Selected and hovered navigation items and buttons reach 4.5:1 text contrast in both themes; their tints are fainter.
 - Marking or clearing a requirement as reviewed no longer overwrites marks saved from another tab.
 - Collapsing or expanding a table group no longer overwrites groups another tab saved.
 

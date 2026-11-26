@@ -1,5 +1,5 @@
 // (WEB-08) open in an editor: `scheme://file/<abs path>:<line>` (VS Code family, Zed), JetBrains `open?file=&line=`, or the editor's own form
-const fileUrl = (scheme: string) => (f: string, l: number) => `${scheme}://file${f}:${l}`;
+const fileUrl = (scheme: string) => (f: string, l: number) => `${scheme}://file${f.split("/").map(encodeURIComponent).join("/")}:${l}`;
 const jetbrains = (scheme: string) => (f: string, l: number) => `${scheme}://open?file=${encodeURIComponent(f)}&line=${l}`;
 export const EDITORS: Record<string, (file: string, line: number) => string> = {
   IntelliJ: jetbrains("idea"),

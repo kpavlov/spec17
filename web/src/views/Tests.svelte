@@ -26,9 +26,9 @@
   const testOpts = $derived(["all", "tagged", "untagged"].map((k) => ({ key: k, label: k, count: tcounts[k] })));
   // (WEB-62) one chip per active filter
   const chips = $derived([
-    ...(stateFilter !== "all" ? [{ label: stateFilter, remove: () => filter({ state: "all" }) }] : []),
-    ...(onlyChanged ? [{ label: "changed", remove: () => filter({ changed: undefined }) }] : []),
-    ...(route.module ? [{ label: route.module, remove: () => filter({ module: undefined }) }] : []),
+    ...(stateFilter !== "all" ? [{ key: "state", label: stateFilter, remove: () => filter({ state: "all" }) }] : []),
+    ...(onlyChanged ? [{ key: "changed", label: "changed", remove: () => filter({ changed: undefined }) }] : []),
+    ...(route.module ? [{ key: "module", label: route.module, remove: () => filter({ module: undefined }) }] : []),
   ]);
   const activeTestFilters = $derived(chips.length);
   const testRequirement = $derived(route.requirementId?.toUpperCase());
@@ -64,7 +64,7 @@
 </div>
 {#if chips.length}
   <div class="filter-chips" role="group" aria-label="Active test filters">
-    {#each chips as c (c.label)}
+    {#each chips as c (c.key)}
       <span class="filter-chip">
         <button type="button" title="Edit filter" aria-label="Edit filter, {c.label}" onclick={() => openFilterMenu()}>{c.label}</button>
         <button type="button" title="Remove {c.label}" aria-label="Remove filter {c.label}" onclick={() => { c.remove(); document.querySelector<HTMLButtonElement>(".req-toolbar .filter-toggle")?.focus(); }}>×</button>

@@ -30,7 +30,7 @@ spec17: Rust workspace (`core`, `server`) + Svelte dashboard (`web`) + the agent
 
 - Spec places (`core/src/detect.rs::spec_paths`): a specs folder, single files (`SPEC.md`), any markdown with a requirement line as a last resort; `Spec.file` is repo-root-relative. `[ID](x.md)` links and decision folders give `ref` docs (`Project::docs`): never due.
 
-- **Dogfooding.** `specs/*.md` are this repo's requirements (`SCAN-`, `GRAPH-`, `API-`, `SETUP-`, `WEB-`, `NFR-` for CI and deployment, all `(manual)`), configured by `spec17.json` for Rust. A Rust test is tagged with `#[doc = "[API-02]"]` above its `#[test]` (a `// [ID]` comment would count as comment-only); code cites with `// (API-02)`. Fixture tags in tests must not look real: write `[DEM\x2D01]`. Run `make report`; new behaviour gets a spec bullet first.
+- **Dogfooding.** `specs/*.md` are this repo's requirements (`SCAN-`, `GRAPH-`, `API-`, `SETUP-`, `WEB-`, `NFR-` for CI and deployment, all `(manual)`), configured by `spec17.json` for Rust. A Rust test is tagged with `#[doc = "[API-02]"]` above or below its `#[test]` (a `// [ID]` comment would count as comment-only); code cites with `// (API-02)`. Fixture tags in tests must not look real: write `[DEM\x2D01]`. Run `make report`; new behaviour gets a spec bullet first.
 
 ## Sandbox notes
 

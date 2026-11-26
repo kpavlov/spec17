@@ -8,12 +8,19 @@ export const saved = $state<{ list: SavedView[] }>({ list: [] });
 type Edit = (list: SavedView[]) => SavedView[];
 // edits made before the root was known: stored once it is
 const early: Edit[] = [];
+// counts this tab's edits: a read or an older write that lands after a newer one must not replace the list
+let edits = 0;
 
 // the edit goes onto the stored list, not this tab's copy over it: another tab may have saved since
 async function write(root: string, edit: Edit) {
-  try { saved.list = await update<SavedView[]>("views", root, (list) => edit(list ?? [])); } catch { /* storage blocked */ }
+  const at = edits;
+  try {
+    const stored = await update<SavedView[]>("views", root, (list) => edit(list ?? []));
+    if (at === edits) saved.list = stored;
+  } catch { /* storage blocked */ }
 }
 function change(edit: Edit) {
+  edits++;
   saved.list = edit(saved.list); // at once, also without storage
   if (db.root === null) early.push(edit); else write(db.root, edit);
 }
@@ -22,7 +29,11 @@ export async function loadViews(root: string) {
   if (!root) return;
   const queued = early.splice(0);
   if (queued.length) return write(root, (list) => queued.reduce((l, edit) => edit(l), list));
-  try { saved.list = (await run<SavedView[] | undefined>("views", "readonly", (s) => s.get(root))) ?? saved.list; } catch { /* storage blocked */ }
+  const at = edits;
+  try {
+    const stored = await run<SavedView[] | undefined>("views", "readonly", (s) => s.get(root));
+    if (at === edits) saved.list = stored ?? saved.list;
+  } catch { /* storage blocked */ }
 }
 
 /** Stores the views held now, as after a database reset (WEB-72). */

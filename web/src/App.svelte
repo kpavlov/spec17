@@ -3,7 +3,7 @@
   import { call, embedded, onToolInput, read, watch } from "$lib/transport";
   import { parse } from "$lib/router";
   import { nav, navigate, DOCS as docs } from "$lib/nav.svelte";
-  import { data, load } from "$lib/data.svelte";
+  import { data, load, loadCount } from "$lib/data.svelte";
   import { setupState, loadSetup } from "$lib/setup.svelte";
   import { filters, states, facets, facetShortcuts, clearReqFilters, selected, options, actionable, openFilterMenu } from "$lib/requirements/filterState.svelte";
   import { writeValues } from "$lib/requirements/filters";
@@ -107,12 +107,14 @@
   });
 
   // each view loads what its URL names
+  let traceReq = 0;
   $effect(() => {
-    const id = route.id;
+    const id = route.id, n = ++traceReq;
     void data.rows; // a refresh replaces the rows and must reload the open trace
     if (!id || inDocs) { data.trace = null; return; }
+    const started = loadCount(); // a failure from before a newer load says nothing about it
     // the previous trace stays (dimmed) until the new one lands, so the preview pane never collapses and reopens
-    call("trace", { id }).then((r) => { if (!nav.inDocs && nav.route.id === id) { data.trace = r; document.querySelector(".split .preview")?.scrollTo(0, 0); } }).catch((e) => { data.trace = null; data.error = e.message; });
+    call("trace", { id }).then((r) => { if (n !== traceReq) return; data.trace = r; document.querySelector(".split .preview")?.scrollTo(0, 0); }).catch((e) => { if (n !== traceReq || started !== loadCount()) return; data.trace = null; data.error = e.message; });
   });
 
   // each selection takes a token (also when the file is already loaded), so a slower earlier response cannot replace it
@@ -124,9 +126,10 @@
     if (f && f !== untrack(() => data.specLoaded)) call("file", { name: f }).then((r) => { if (n !== docReq) return; data.specLoaded = f; data.specMd = r.data.markdown; document.querySelector(".doc")?.scrollTo(0, 0); }).catch((e) => { if (n === docReq) data.error = e.message; });
   });
 
+  let srcReq = 0;
   $effect(() => {
-    const path = route.tab === "code" || route.tab === "tests" ? route.path : undefined;
-    if (path && untrack(() => data.code?.path) !== path) call("source", { path }).then((r) => (data.code = r.data)).catch((e) => { data.code = null; data.error = e.message; });
+    const path = route.tab === "code" || route.tab === "tests" ? route.path : undefined, n = ++srcReq;
+    if (path && untrack(() => data.code?.path) !== path) call("source", { path }).then((r) => { if (n === srcReq) data.code = r.data; }).catch((e) => { if (n === srcReq) { data.code = null; data.error = e.message; } });
   });
 
   // fetched once per load generation, when its tab is open

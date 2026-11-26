@@ -54,8 +54,8 @@
   /* accent tints: hover/selected rows, group headers, button hover, the current tab, a chosen segment, an id chip on hover */
   --tint-hover: color-mix(in srgb, var(--accent) 9%, transparent);
   --tint-group: color-mix(in srgb, var(--accent) 5%, transparent);
-  --tint-btn: color-mix(in srgb, var(--accent) 16%, var(--raised));
-  --tint-on: color-mix(in srgb, var(--accent) 26%, var(--raised));
+  --tint-btn: color-mix(in srgb, var(--accent) 8%, var(--raised));
+  --tint-on: color-mix(in srgb, var(--accent) 12%, var(--raised));
   --tint-sel: color-mix(in srgb, var(--accent) 18%, var(--card));
   --tint-sel-hover: color-mix(in srgb, var(--accent) 24%, var(--card));
   --tint-id: color-mix(in srgb, var(--accent) 10%, var(--card));

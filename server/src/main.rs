@@ -497,6 +497,7 @@ mod tests {
         d
     }
 
+    #[doc = "[WEB-66]"]
     #[test]
     fn info_names_the_branch_only_in_a_git_work_tree() {
         // shortcut: assumes the temp dir is outside any git work tree, set TMPDIR elsewhere if it is not

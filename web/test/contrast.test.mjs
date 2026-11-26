@@ -56,12 +56,15 @@ test("coloured text reaches WCAG 4.5:1, control borders and the focus ring 3:1",
 });
 
 // [WEB-63]
-test("accent text stays at WCAG 4.5:1 on the selected row's tint", () => {
-  const p = Number(css.match(/--tint-sel:\s*color-mix\(in srgb, var\(--accent\) (\d+)%, var\(--card\)/)[1]) / 100;
-  for (const [t, theme] of THEMES.entries()) {
-    const accent = pairs.accent[t], card = rgb(pairs.card[t]);
-    const tint = "#" + rgb(accent).map((c, i) => Math.round((c * p + card[i] * (1 - p)) * 255).toString(16).padStart(2, "0")).join("");
-    assert.ok(wcag(accent, tint) >= 4.5, `${theme}: ${wcag(accent, tint).toFixed(2)}`);
+test("accent text stays at WCAG 4.5:1 on the tints: selected row, hover, the selected item", () => {
+  for (const name of ["tint-sel", "tint-btn", "tint-on"]) {
+    const [, percent, under] = css.match(new RegExp(`--${name}:\\s*color-mix\\(in srgb, var\\(--accent\\) (\\d+)%, var\\(--([\\w-]+)\\)`));
+    const p = Number(percent) / 100;
+    for (const [t, theme] of THEMES.entries()) {
+      const accent = pairs.accent[t], base = rgb(pairs[under][t]);
+      const tint = "#" + rgb(accent).map((c, i) => Math.round((c * p + base[i] * (1 - p)) * 255).toString(16).padStart(2, "0")).join("");
+      assert.ok(wcag(accent, tint) >= 4.5, `${theme}: --${name} ${wcag(accent, tint).toFixed(2)}`);
+    }
   }
 });
 
