@@ -9,7 +9,7 @@ license-file.workspace = true
 homepage.workspace = true
 readme = "../README.md"
 keywords.workspace = true
-categories.workspace = true
+categories = ["command-line-utilities", "development-tools", "development-tools::testing"]
 
 [dependencies]
 spec17-core = { path = "../core" }
