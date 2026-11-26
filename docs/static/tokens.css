@@ -31,6 +31,9 @@
   --text-section: 1.125rem;
   --text-title: 1.25rem;
   --text-page: 1.5rem;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
   --leading: 1.5;
   --leading-tight: 1.4; /* table cells and labels */
   --measure: 70ch; /* the longest line of prose */
@@ -62,10 +65,9 @@
   --btn-fg-hover: var(--accent);
   --btn-pad: 5px 12px;
   --input-pad: 6px 10px;
+  --nav-pad: 6px 10px; /* a navigation link: the dashboard sidebar and the docs menu */
   --focus-ring: 2px solid var(--accent);
 }
 :root[data-density="compact"] { --row-h: 2.25rem; --cell-pad-y: .25rem; }
-/* only fonts already installed on the computer: nothing is fetched */
-:root[data-font="legible"] { --sans: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif; }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }

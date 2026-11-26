@@ -12,7 +12,6 @@
         var theme = get("theme"), size = get("textsize");
         if (theme === "light" || theme === "dark") el.dataset.theme = theme;
         if (get("density") === "compact") el.dataset.density = "compact";
-        if (get("font") === "legible") el.dataset.font = "legible";
         if (size === "90" || size === "112.5" || size === "125") el.style.fontSize = size + "%";
       } catch (e) {}
     </script>

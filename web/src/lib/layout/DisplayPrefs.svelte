@@ -10,7 +10,7 @@
   {#each DISPLAY as f (f.key)}
     <div><Seg label={f.label} options={f.options} value={prefs[f.key]} onpick={(v) => setPref(f.key, v)} /></div>
   {/each}
-  <p class="muted">Remembered in this browser. High legibility uses <a href="https://fonts.google.com/specimen/Atkinson+Hyperlegible+Next" target="_blank" rel="noopener noreferrer">Atkinson Hyperlegible Next</a> if it is installed on this computer, otherwise the system font: spec17 does not bundle or download it.</p>
+  <p class="muted">Remembered in this browser.</p>
 </section>
 
 <style>

@@ -4,9 +4,6 @@
   --text-metric: 2.125rem;
   /* the sticky header: everything below it is sized from this, so it scales with the text */
   --header-h: 3.3125rem;
-  --weight-medium: 500;
-  --weight-semibold: 600;
-  --weight-bold: 700;
   --badge-padding: 2px 9px;
   --badge-size: var(--text-sm);
   --badge-radius: 999px;

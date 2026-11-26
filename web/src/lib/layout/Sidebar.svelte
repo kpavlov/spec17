@@ -51,7 +51,7 @@
   .group + .group, .grow + .group { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; }
   .grow { flex: 1; }
   .gname { padding: 6px 10px 2px; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--muted); }
-  a.tab, .collapse { display: flex; align-items: center; gap: 10px; position: relative; padding: 6px 10px; white-space: nowrap; background: transparent; color: var(--fg); border-radius: var(--radius); text-decoration: none; }
+  a.tab, .collapse { display: flex; align-items: center; gap: 10px; position: relative; padding: var(--nav-pad); white-space: nowrap; background: transparent; color: var(--fg); border-radius: var(--radius); text-decoration: none; }
   .collapse { color: var(--muted); font-size: var(--text-label); }
   a.tab:hover, .collapse:hover:not(:disabled) { background: var(--tint-btn); color: var(--accent); }
   a.tab.on { background: var(--tint-on); color: var(--accent); }
