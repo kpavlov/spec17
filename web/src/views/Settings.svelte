@@ -2,6 +2,7 @@
   import Icon from "$lib/ui/Icon.svelte";
   import Pill from "$lib/ui/Pill.svelte";
   import Seg from "$lib/ui/Seg.svelte";
+  import DisplayPrefs from "$lib/layout/DisplayPrefs.svelte";
   import { levelTone } from "$lib/tone";
   import { plural } from "$lib/store";
   import { DOCS as docs } from "$lib/nav.svelte";
@@ -113,10 +114,11 @@
             {:else if cgIdx?.level === "ok" || indexAction === "sync"}<button class="end" disabled={busy} onclick={() => runIndex("sync")}>Sync index</button>{/if}
           {/if}
         </div>
+        <p class="muted"><a href="https://github.com/colbymchenry/codegraph" target="_blank" rel="noopener noreferrer">CodeGraph</a> is a separate tool that indexes your code's symbols and calls into a local database, which spec17 reads to link tests to code and to find overlapping and uncovered code.</p>
         {#if indexLog}<pre class="log" aria-live="polite">{indexLog}</pre>{/if}
         <details open={cgBin?.level !== "ok" || cgIdx?.level !== "ok" || !cgMcp}>
           <summary>{cgBin?.level === "ok" ? "Installed" : "Installation needed"} · {cgMcp ? `Connected (${cgMcp})` : "Agent disconnected"} · {cgIdx?.level === "ok" ? "Index current" : "Check index"}</summary>
-          <p class="muted">Enables test-to-code links, overlap and uncovered-code analysis. <a href="{docs}/usage/#codegraph" target="_blank" rel="noopener noreferrer">How spec17 uses it</a>.</p>
+          <p class="muted"><a href="{docs}/usage/#codegraph" target="_blank" rel="noopener noreferrer">How spec17 uses it</a>.</p>
           {#if cgBin}<p><strong>Installation</strong> · {cgBin.detail}</p>{/if}
         {#if cgBin && cgBin.level !== "ok"}
           <pre class="log">curl -fsSL https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh | sh
@@ -137,6 +139,8 @@ irm https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.ps1 | 
       </section>
       </div>
     {/if}
+    <!-- not part of the setup check: shown while it loads or when it fails -->
+    <DisplayPrefs />
 
 <style>
   .error { margin: 12px var(--gutter); padding: 10px 14px; border: 1px solid var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--card)); color: var(--bad); border-radius: var(--radius); }

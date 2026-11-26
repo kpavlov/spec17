@@ -6,11 +6,12 @@
   // With an `id` (WEB-34) it also remembers per browser whether it is open and the height dragged on the gap below it.
   let { title, count, tone, open = true, id, children }: { title: string; count?: number; tone?: Tone; open?: boolean; id?: string; children: Snippet } = $props();
   // `id` and the default are read once: what was remembered takes over from there
-  const kept = untrack(() => (id ? loadSection(id) : null));
-  let isOpen = $state(kept ? kept.open : untrack(() => open));
+  const initial = untrack(() => open);
+  const kept = untrack(() => (id ? loadSection(id, initial) : null));
+  let isOpen = $state(kept ? kept.open : initial);
   let height = $state<number | null>(kept?.h ?? null);
   let body = $state<HTMLElement>();
-  $effect(() => { if (id) saveSection(id, { open: isOpen, h: height }); });
+  $effect(() => { if (id) saveSection(id, { open: isOpen, h: height }, initial); });
   const MIN = 48, STEP = 24;
   // the body's height now: what the separator reports, and where a drag or a key starts from
   let shownHeight = $state(0);
@@ -39,7 +40,7 @@
 <details class="section" data-tone={tone} bind:open={isOpen}>
   <summary><span>{title}</span>{#if height !== null}<button class="auto" title="Back to the automatic height" aria-label="Back to the automatic height of {title}" onclick={auto}>↕</button>{/if}{#if count !== undefined}<b class="count">{count}</b>{/if}</summary>
   {#if id}
-    <div class="body" class:sized={height !== null} bind:this={body} bind:offsetHeight={shownHeight} style:height={height === null ? null : `${height}px`}>{@render children()}</div>
+    <div class="body" class:sized={height !== null} bind:this={body} bind:offsetHeight={shownHeight} style:max-height={height === null ? null : `${height}px`}>{@render children()}</div>
     <!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
     <div class="gap" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="resize {title}" aria-valuemin={MIN} aria-valuemax={Math.max(2000, shownHeight)} aria-valuenow={shownHeight} aria-valuetext="{shownHeight} pixels{height === null ? ', automatic' : ''}" title="Drag to resize; double-click or Home to reset" onpointerdown={down} onpointermove={move} onpointerup={() => (from = null)} onpointercancel={() => (from = null)} ondblclick={() => (height = null)} onkeydown={keys}></div>
   {:else}

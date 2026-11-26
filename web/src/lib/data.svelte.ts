@@ -4,6 +4,7 @@ import { call, read } from "$lib/transport";
 import { nav } from "$lib/nav.svelte";
 import { plain } from "$lib/store";
 import { reviewed, loadReviewed } from "$lib/reviewed.svelte";
+import { loadViews } from "$lib/requirements/viewStore.svelte";
 
 export type Ref = { file: string; line: number; text: string };
 export type Row = { id: string; state: string; file: string; line: number; level: string; priority: string | null; effort: string | null; text: string; references: string[]; mark: string; done: boolean; verdict: string; built: boolean; issues: string[]; tests: Ref[]; cites: Ref[]; graph: string[] };
@@ -111,5 +112,5 @@ export async function load() {
   data.loadedAt = Date.now();
   // asked on every load, as the branch may have changed; the reviewed marks are read once, for the root
   const first = !untrack(() => data.root);
-  fetch("/api/info").then((x) => x.json()).then((i) => { data.root = i.root ?? ""; data.branch = i.branch ?? ""; }).catch(() => {}).finally(() => { if (first) loadReviewed(data.root); });
+  fetch("/api/info").then((x) => x.json()).then((i) => { data.root = i.root ?? ""; data.branch = i.branch ?? ""; }).catch(() => {}).finally(() => { if (first) loadReviewed(data.root).then(() => loadViews(data.root)); });
 }

@@ -48,9 +48,9 @@
 <span bind:this={tip} {id} popover="manual" role="tooltip">{title}</span>
 
 <style>
-  button { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; line-height: 1.25; padding: 0; border: 0; background: transparent; font-family: system-ui, sans-serif; cursor: help; }
+  button { display: inline-flex; align-items: center; justify-content: center; min-width: 24px; min-height: 24px; line-height: 1.25; padding: 0; border: 0; background: transparent; font-family: var(--sans); cursor: help; }
   button > :global(span) { margin-right: 0; }
   button > :global(span:has(> svg)) { display: grid; place-items: center; min-width: 24px; min-height: 24px; padding: 0 3px; }
   button:hover:not(:disabled) { background: transparent; }
-  [popover] { position: fixed; inset: auto; margin: 0; max-width: min(20rem, calc(100vw - 16px)); white-space: normal; padding: 6px 10px; background: var(--tooltip-bg); color: var(--fg); border: 1px solid var(--muted); border-radius: var(--radius); font: var(--text-sm)/1.5 system-ui, sans-serif; }
+  [popover] { position: fixed; inset: auto; margin: 0; max-width: min(20rem, calc(100vw - 16px)); white-space: normal; padding: 6px 10px; background: var(--tooltip-bg); color: var(--fg); border: 1px solid var(--muted); border-radius: var(--radius); font: var(--text-sm)/1.5 var(--sans); }
 </style>

@@ -1,23 +1,16 @@
 <script lang="ts">
   import Icon from "$lib/ui/Icon.svelte";
   import { ago } from "$lib/ago";
+  import { togglePalette } from "$lib/layout/Palette.svelte";
+  import { prefs, setPref } from "$lib/prefs.svelte";
   import { nav, u } from "$lib/nav.svelte";
   import { data } from "$lib/data.svelte";
   import { setupState, rescan } from "$lib/setup.svelte";
 
-  // ---- theme: auto (OS) | light | dark, remembered per browser ----
-  type Theme = "auto" | "light" | "dark";
   // one button cycles system → light → dark; it shows the current state
-  const themes: { v: Theme; icon: "system" | "sun" | "moon"; name: string }[] = [{ v: "auto", icon: "system", name: "system" }, { v: "light", icon: "sun", name: "light" }, { v: "dark", icon: "moon", name: "dark" }];
-  const curTheme = $derived(themes.find((t) => t.v === theme)!);
+  const themes: { v: string; icon: "system" | "sun" | "moon"; name: string }[] = [{ v: "auto", icon: "system", name: "system" }, { v: "light", icon: "sun", name: "light" }, { v: "dark", icon: "moon", name: "dark" }];
+  const curTheme = $derived(themes.find((t) => t.v === prefs.theme)!);
   const nextTheme = $derived(themes[(themes.indexOf(curTheme) + 1) % themes.length]);
-  const saved = (): Theme => { try { const t = localStorage.getItem("spec17.theme"); return t === "light" || t === "dark" ? t : "auto"; } catch { return "auto"; } };
-  let theme = $state<Theme>(saved());
-  $effect(() => {
-    const el = document.documentElement;
-    if (theme === "auto") delete el.dataset.theme; else el.dataset.theme = theme;
-    try { theme === "auto" ? localStorage.removeItem("spec17.theme") : localStorage.setItem("spec17.theme", theme); } catch { /* storage blocked */ }
-  });
 
   const route = $derived(nav.route);
   const up = $derived(data.up);
@@ -37,8 +30,9 @@
   {#if repo}<span class="where mono muted"><span title={root}>{repo}</span>{#if data.branch}{" · "}<span title="current git branch">{data.branch}</span>{/if}</span>{/if}
   <span class="grow"></span>
   {#if data.loadedAt}<span class="age muted" title="The dashboard loaded the scan at {new Date(data.loadedAt).toLocaleTimeString()}">{age}</span>{/if}
+  <button class="icon" onclick={togglePalette} title="Command palette (⌘K or Ctrl+K)" aria-label="command palette" aria-haspopup="dialog"><Icon name="search" /></button>
   <button class="icon" disabled={busy} onclick={rescan} title="Rescan the repo (syncs the CodeGraph index first){age ? `, ${age}` : ''}" aria-label="rescan{age ? `, ${age}` : ''}"><Icon name="rescan" /></button>
-  <button class="icon" onclick={() => (theme = nextTheme.v)} title="Theme: {curTheme.name} (click for {nextTheme.name})" aria-label="Theme: {curTheme.name}, switch to {nextTheme.name}"><Icon name={curTheme.icon} /></button>
+  <button class="icon" onclick={() => setPref("theme", nextTheme.v)} title="Theme: {curTheme.name} (click for {nextTheme.name})" aria-label="Theme: {curTheme.name}, switch to {nextTheme.name}"><Icon name={curTheme.icon} /></button>
   <a class="tab icon" class:on={route.tab === "settings"} aria-current={route.tab === "settings" ? "page" : undefined} href={u({ tab: "settings" })} title={setupBadge ? "Settings (needs attention)" : "Settings"} aria-label="Settings"><Icon name="settings" />{#if setupBadge}<span class="badge" data-tone={setupBadge} title="needs attention: open Settings">!</span>{/if}</a>
 </header>
 

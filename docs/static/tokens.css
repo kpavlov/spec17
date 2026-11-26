@@ -2,16 +2,16 @@
    Theme: `auto` follows the OS; data-theme="light|dark" on <html> forces one. Every colour is a light-dark() pair. */
 :root {
   color-scheme: light dark;
-  --bg: light-dark(#fafaf8, #121212);
-  --card: light-dark(#ffffff, #1e1e1e);
-  --tooltip-bg: light-dark(#efede7, #33312d);
-  --raised: light-dark(#f0f0ec, #2a2a2a);
-  --fg: light-dark(#1f2328, #e0e0e0);
-  --muted: light-dark(#555e6b, #b8b8b8);
-  --line: light-dark(#e2e2dd, #383838);
+  --bg: light-dark(#fafaf8, #1b1b1b);
+  --card: light-dark(#ffffff, #262626);
+  --tooltip-bg: light-dark(#efede7, #3c3a36);
+  --raised: light-dark(#f0f0ec, #323232);
+  --fg: light-dark(#1f2328, #e6e6e6);
+  --muted: light-dark(#555e6b, #c2c2c2);
+  --line: light-dark(#e2e2dd, #424242);
   --accent: light-dark(#6d3bd2, #b69cff);
   --ok: light-dark(#13693d, #4ade80);
-  --line-strong: light-dark(#838b96, #808080); /* control borders: >= 3:1 (WCAG 1.4.11) */
+  --line-strong: light-dark(#838b96, #8a8a8a); /* control borders: >= 3:1 (WCAG 1.4.11) */
   --warn: light-dark(#8a5a00, #f0c674);
   --bad: light-dark(#a3262e, #ff9a9a);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -63,5 +63,7 @@
   --focus-ring: 2px solid var(--accent);
 }
 :root[data-density="compact"] { --row-h: 2.25rem; --cell-pad-y: .25rem; }
+/* only fonts already installed on the computer: nothing is fetched */
+:root[data-font="legible"] { --sans: "Atkinson Hyperlegible Next", "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif; }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }

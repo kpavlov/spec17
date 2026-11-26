@@ -3,8 +3,9 @@
   import FilterMenu from "$lib/requirements/FilterMenu.svelte";
   import SplitToggle from "$lib/layout/SplitToggle.svelte";
   import ViewSeg from "$lib/requirements/ViewSeg.svelte";
+  import SavedViews from "$lib/requirements/SavedViews.svelte";
   import { nav, u, filter } from "$lib/nav.svelte";
-  import { filters, facets, facetLabels, facetShortcuts, clearReqFilters, selected, options, actionable, optionLabel, optionTone, pickFacet, clearFacet, editFacet } from "$lib/requirements/filterState.svelte";
+  import { filters, facets, facetLabels, facetShortcuts, clearReqFilters, selected, options, actionable, optionLabel, optionTone, pickFacet, clearFacet, editFacet, readQuery, applyQuery } from "$lib/requirements/filterState.svelte";
 
   // (WEB-59) the filter toolbar Requirements and Changes share
   const route = $derived(nav.route);
@@ -15,10 +16,11 @@
   const filtering = $derived(filters.filtering);
   const shown = $derived(filters.shown);
   const reqFilterRows = $derived(filters.rows);
+  const pending = $derived(query.includes(":") && readQuery(query).picked.length > 0);
 </script>
 
 <div class="bar req-toolbar">
-  <input name="filter" aria-label={onChanges ? "Search affected requirements" : "Search requirements"} placeholder="Search requirements…" title="Search by ID, text or file (/)" value={query} oninput={(e) => filter({ q: e.currentTarget.value })} />
+  <input name="filter" aria-label={onChanges ? "Search affected requirements" : "Search requirements"} placeholder="Search requirements…" title="Search by ID, text or file (/). Enter turns key:value words (state, level, priority, effort, changed, reviewed) into filters, e.g. state:none level:must" value={query} oninput={(e) => filter({ q: e.currentTarget.value })} onkeydown={(e) => e.key === "Enter" && !e.isComposing && applyQuery(e.currentTarget.value)} />
   <FilterMenu active={activeReqFilters} disabled={!hasFilters} title={hasFilters ? "Filter requirements (F)" : "Nothing to filter by: every requirement has the same values"}>
     {#each facets as key}
       {@const values = selected(key)}
@@ -30,7 +32,8 @@
       {/if}
     {/each}
   </FilterMenu>
-  <span class="found muted nowrap" aria-live="polite">{shown.length} of {reqFilterRows.length}</span>
+  <SavedViews />
+  <span class="found muted nowrap" aria-live="polite">{#if pending}Press Enter to apply the filter{:else}{shown.length} of {reqFilterRows.length}{/if}</span>
   {#if filtering}<a class="clear-filters" href={u({ ...route, ...clearReqFilters })} aria-label="Clear requirement filters" title="Clear requirement filters (0)">Clear</a>{/if}
   {#if route.tab === "requirements"}<ViewSeg />{/if}
   {#if !onChanges && route.id}<SplitToggle />{/if}

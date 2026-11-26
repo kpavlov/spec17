@@ -36,14 +36,14 @@ export const diffWrap = $state({ on: read("spec17.diffwrap") === "1" });
 export const setDiffWrap = (on: boolean) => { diffWrap.on = on; write("spec17.diffwrap", on ? "1" : null); };
 export const setView = (v: string) => { preview.view = v === "diff" ? "diff" : "actual"; write("spec17.view", preview.view); };
 
-// A collapsible Section with an `id` remembers per browser whether it is open and the height (px) its bottom edge was dragged to; `h: null` = as tall as its content.
+// A collapsible Section with an `id` remembers per browser whether it is open and the height (px) its bottom edge was dragged to, a limit: shorter content is never padded; `h: null` = no limit.
 export type SectionState = { open: boolean; h: number | null };
-export const loadSection = (id: string): SectionState => {
+export const loadSection = (id: string, open: boolean): SectionState => {
   try {
     const v = JSON.parse(read("spec17.section." + id) ?? "{}");
-    return { open: v.open !== false, h: typeof v.h === "number" && v.h > 0 ? v.h : null };
-  } catch { return { open: true, h: null }; }
+    return { open: typeof v.open === "boolean" ? v.open : open, h: typeof v.h === "number" && v.h > 0 ? v.h : null };
+  } catch { return { open, h: null }; }
 };
 // the defaults are not stored
-export const saveSection = (id: string, s: SectionState) => write("spec17.section." + id, s.open && s.h === null ? null : JSON.stringify(s));
+export const saveSection = (id: string, s: SectionState, open: boolean) => write("spec17.section." + id, s.open === open && s.h === null ? null : JSON.stringify(s));
 

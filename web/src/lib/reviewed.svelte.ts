@@ -9,6 +9,9 @@ let pending: Map<string, string | undefined> | null = new Map();
 
 const save = (root: string) => run("reviewed", "readwrite", (s) => s.put($state.snapshot(reviewed), root)).catch(() => {});
 
+/** Stores the marks held now, as after a database reset (WEB-72). */
+export const storeReviewed = () => { if (db.root !== null) save(db.root); };
+
 export async function loadReviewed(root: string) {
   if (!root) return; // no root yet: db.root stays null and nothing is persisted
   try { Object.assign(reviewed, (await run<Record<string, string> | undefined>("reviewed", "readonly", (s) => s.get(root))) ?? {}); } catch { /* storage blocked */ }

@@ -1,7 +1,7 @@
 // The requirement facets, shared by the Requirements and Changes pages and by the filter keys. The URL holds the selection.
 import { nav, navigate } from "$lib/nav.svelte";
 import { data, isDirect, isReviewed, type Row } from "$lib/data.svelte";
-import { readValues, writeValues, pickValue, collapseAll, matches, type Value } from "$lib/requirements/filters";
+import { readValues, writeValues, pickValue, collapseAll, matches, type Value, parseQuery, mergePicked } from "$lib/requirements/filters";
 import { requirementLevelTone, priorityTone, effortTone, stateTone, stateIcon, stateLabel, STATE_HINT } from "$lib/tone";
 
 export const states = ["all", "none", "src-only", "tested", "manual", "later", "ref"];
@@ -62,6 +62,14 @@ export const actionable = (key: Facet, choices = options(key)) => choices.length
 // (WEB-60) a plain click selects only that value; a modifier click (and a chip's ×) adds or removes it; every value selected is All
 export const pickFacet = (key: Facet, value: Value, additive = true) => navigate({ ...nav.route, [key]: writeValues(collapseAll(pickValue(selected(key), value, additive), options(key).slice(1).map((o) => JSON.parse(o.key)))) });
 export const clearFacet = (key: Facet) => navigate({ ...nav.route, [key]: undefined });
+// (WEB-70) the filter words of a search, against the values a facet can take here
+export const readQuery = (text: string) => parseQuery(text, Object.fromEntries(facets.map((key) => [key, [...new Set([...(key === "state" ? states.slice(1) : key === "level" ? levels : []), ...filters.rows.map((row) => facetValue(row, key))])]])));
+export const applyQuery = (text: string) => {
+  const { picked, rest } = readQuery(text);
+  if (!picked.length) return;
+  const patch = mergePicked(picked, (key) => selected(key as Facet), (key) => options(key as Facet).slice(1).map((o) => JSON.parse(o.key)));
+  navigate({ ...nav.route, ...patch, q: rest || undefined });
+};
 // (WEB-59) open the menu and focus a control in it
 export const openFilterMenu = (focus = "button") => { const menu = document.getElementById("filter-menu"); menu?.showPopover(); menu?.querySelector<HTMLElement>(focus)?.focus(); };
 export const editFacet = (key: Facet) => openFilterMenu(`[data-facet="${key}"] button[aria-pressed=true]`);

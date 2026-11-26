@@ -323,7 +323,7 @@
 </div>
 
 <style>
-  .tip { position: absolute; z-index: 1; width: min(24rem, calc(100% - 8px)); pointer-events: none; padding: 6px 10px; background: var(--tooltip-bg); color: var(--fg); border: 1px solid var(--muted); border-radius: var(--radius); font: var(--text-sm)/1.5 system-ui, sans-serif; }
+  .tip { position: absolute; z-index: 1; width: min(24rem, calc(100% - 8px)); pointer-events: none; padding: 6px 10px; background: var(--tooltip-bg); color: var(--fg); border: 1px solid var(--muted); border-radius: var(--radius); font: var(--text-sm)/1.5 var(--sans); }
   .tip span { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden; overflow-wrap: anywhere; }
   .graph { position: relative; height: calc(100vh - 13.75rem); min-height: 360px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
   canvas { font-size: var(--text-sm); display: block; cursor: grab; touch-action: none; user-select: none; }

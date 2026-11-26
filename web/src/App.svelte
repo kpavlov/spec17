@@ -8,8 +8,12 @@
   import { filters, states, facets, facetShortcuts, clearReqFilters, selected, options, actionable, openFilterMenu } from "$lib/requirements/filterState.svelte";
   import { writeValues } from "$lib/requirements/filters";
   import { stored, save } from "$lib/store";
+  import { db, deleteDb } from "$lib/db.svelte";
+  import { storeReviewed } from "$lib/reviewed.svelte";
+  import { storeViews } from "$lib/requirements/viewStore.svelte";
   import Header from "$lib/layout/Header.svelte";
   import Sidebar from "$lib/layout/Sidebar.svelte";
+  import Palette, { togglePalette } from "$lib/layout/Palette.svelte";
   import Settings from "./views/Settings.svelte";
   import Dashboard from "./views/Dashboard.svelte";
   import Documents from "./views/Documents.svelte";
@@ -49,6 +53,18 @@
   let dismissed = $state(stored("spec17.banner"));
   const dismiss = (m: string) => { dismissed = m; save("spec17.banner", m); };
   const setup = $derived(setupState.setup);
+
+  // (WEB-72) offered only: nothing is deleted before the user agrees
+  let resetNote = $state("");
+  async function resetStorage() {
+    if (!confirm("Reset spec17's browser storage for this address?\n\nThis deletes the reviewed marks, collapsed groups and saved views of every repository opened here. The reviewed marks and views this tab holds are stored again. Your files are not touched.")) return;
+    try {
+      await deleteDb(() => (resetNote = "Close the other spec17 tabs to finish the reset."));
+      storeReviewed();
+      storeViews();
+      resetNote = "";
+    } catch (e: any) { resetNote = `The reset failed (${e?.message ?? e}). Clear this site's data in the browser instead.`; }
+  }
   let rail = $state(false);
 
   // keyboard: `/` focuses the filter (opening the requirements list first), filter shortcuts, Esc closes the trace panel (↑/↓ on the lists: DataTable)
@@ -57,6 +73,10 @@
       const route = nav.route;
       const onReqs = route.tab === "requirements" || route.tab === "changes";
       const t = e.target as HTMLElement;
+      // (WEB-69) before anything else: it works from a text field too
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") { e.preventDefault(); togglePalette(); return; }
+      // the open palette is modal: it has every other key, Escape included
+      if (document.querySelector("dialog[open]")) return;
       // an open popover (the filter menu, a tooltip) takes Escape; nothing behind it closes
       if (e.key === "Escape" && document.querySelector(":popover-open")) return;
       if (t.closest("input, select, textarea, .gutter, .seg") || e.metaKey || e.ctrlKey || e.altKey) { if (e.key === "Escape") (t as HTMLElement).blur(); return; }
@@ -164,6 +184,7 @@
 </script>
 
 <Header />
+<Palette />
 
 <div class="shell" class:rail>
 <Sidebar bind:collapsed={rail} />
@@ -175,6 +196,14 @@
     <span class="grow"></span>
     <a class="tab" href="/settings">Open Settings</a>
     <button aria-label="dismiss" title="Hide until the message changes" onclick={() => dismiss(setup!.suggestions[0])}>✕</button>
+  </p>
+{/if}
+
+{#if db.broken}
+  <p class="banner" role="alert">
+    <span>{resetNote || `The browser storage for reviewed marks, collapsed groups and saved views cannot be used (${db.broken}), so changes to them may not be kept. Resetting it deletes what it holds.`}</span>
+    <span class="grow"></span>
+    <button onclick={resetStorage}>Reset storage…</button>
   </p>
 {/if}
 

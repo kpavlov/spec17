@@ -10,6 +10,14 @@
 - Keep requirement rows to one line, with status in its own column, long locations cut in the middle (full path on hover or focus, with a copy button), and several change reasons folded into one pill.
 - Replace the always-open filter rows with a "+ Filter" menu and a chip per selected value, on Requirements, Changes and Tests. The menu starts closed.
 - Head every page with the repository name, git branch and scan age (`/api/info` now includes `branch`); cap running text outside requirement lists at 70 characters a line.
+- Rebuild the Dashboard around a summary strip and one problem list grouped into errors and collapsed warnings. Specs to compare are now listed; before, they counted in the total but were not shown.
+- Add display settings: row density, text size, theme and a high-legibility font (used only when installed). Make the dark theme a soft dark grey.
+- Add a command palette (⌘K or Ctrl+K) over views, actions, saved views and requirement IDs.
+- Turn `state:none level:must` words in the requirement search into filters on Enter.
+- Save search-and-filter views per repository. This upgrades the browser database: an older spec17 served on the same port can then no longer load its reviewed marks (releases up to 0.5.0 offer no reset; clear the site's data).
+- Offer to reset the browser database when it cannot be used (made by a newer spec17, incomplete or unreadable). Nothing is deleted before you confirm.
+- Never make a Dashboard or Changes block taller than its content: a dragged height is now a limit.
+- Say in Settings what CodeGraph is, with a link to its project, and link to the high-legibility font from the display settings.
 
 ## 0.5.0
 

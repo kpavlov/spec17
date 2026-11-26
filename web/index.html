@@ -5,7 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%236d3bd2%27/%3E%3Cpath d=%27M4 8.5l2.5 2.5L12 5%27 stroke=%27white%27 stroke-width=%271.8%27 fill=%27none%27/%3E%3C/svg%3E" />
     <title>spec17</title>
-    <script>try { var t = localStorage.getItem("spec17.theme"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}</script>
+    <script>
+      // (WEB-68) the display choices of lib/prefs.svelte.ts, applied before the first paint
+      try {
+        var el = document.documentElement, get = function (k) { return localStorage.getItem("spec17." + k); };
+        var theme = get("theme"), size = get("textsize");
+        if (theme === "light" || theme === "dark") el.dataset.theme = theme;
+        if (get("density") === "compact") el.dataset.density = "compact";
+        if (get("font") === "legible") el.dataset.font = "legible";
+        if (size === "90" || size === "112.5" || size === "125") el.style.fontSize = size + "%";
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="app"></div>
