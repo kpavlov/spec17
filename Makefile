@@ -100,7 +100,7 @@ check-tag:
 
 upload: check-tag
 	@$(MAKE) --no-print-directory dist LABEL="$(VERSION)"
-	gh release view "$(TAG)" >/dev/null 2>&1 || gh release create "$(TAG)" --prerelease --generate-notes --title "$(TAG)" --verify-tag || gh release view "$(TAG)" >/dev/null
+	gh release view "$(TAG)" >/dev/null 2>&1 || gh release create "$(TAG)" --prerelease --generate-notes --title "$(TAG:v%=%)" --verify-tag || gh release view "$(TAG)" >/dev/null
 	@[ "$$(gh release view "$(TAG)" --json isPrerelease,isDraft --jq '.isPrerelease and (.isDraft | not)')" = true ] \
 	  || { echo "$(TAG) must be a published prerelease"; exit 1; }
 	gh release upload "$(TAG)" $(call archive,$(VERSION)) $(call archive,$(VERSION)).sha256 --clobber

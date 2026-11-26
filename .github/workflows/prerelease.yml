@@ -27,7 +27,7 @@ jobs:
           # (NFR-03) Read the version from the tagged checkout.
           case "$TAG" in "v$V" | "v$V"-?*) ;; *) echo "tag $TAG does not match the Cargo version v$V"; exit 1 ;; esac
           gh release view "$TAG" >/dev/null 2>&1 \
-            || gh release create "$TAG" --prerelease --generate-notes --title "$TAG" --verify-tag \
+            || gh release create "$TAG" --prerelease --generate-notes --title "${TAG#v}" --verify-tag \
             || gh release view "$TAG" >/dev/null
           [ "$(gh release view "$TAG" --json isPrerelease,isDraft --jq '.isPrerelease and (.isDraft | not)')" = true ] \
             || { echo "$TAG must be a published prerelease"; exit 1; }
