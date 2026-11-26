@@ -1,12 +1,9 @@
 @import "./tokens.css";
 :root {
   --shadow: none;
-  --text-body: 1rem;
-  --text-sm: .875rem;
-  --text-label: .9375rem;
-  --text-section: 1.125rem;
-  --text-title: 1.25rem;
   --text-metric: 2.125rem;
+  /* the sticky header: everything below it is sized from this, so it scales with the text */
+  --header-h: 3.3125rem;
   --weight-medium: 500;
   --weight-semibold: 600;
   --weight-bold: 700;
@@ -38,9 +35,9 @@
 
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--bg); color: var(--fg); font: var(--text-body)/1.55 var(--sans); }
+body { margin: 0; background: var(--bg); color: var(--fg); font: var(--text-body)/var(--leading) var(--sans); }
 code, pre, .mono { font-family: var(--mono); font-size: var(--text-sm); }
-:where(h1, h2, h3, h4) { line-height: 1.3; font-weight: var(--weight-semibold); }
+:where(h1, h2, h3, h4) { line-height: 1.25; font-weight: var(--weight-semibold); }
 a { color: var(--accent); text-underline-offset: 2px; }
 button { font: inherit; color: var(--fg); background: var(--btn-bg); border: 1px solid transparent; border-radius: var(--radius); padding: var(--btn-pad); cursor: pointer; }
 button:hover:not(:disabled) { background: var(--btn-bg-hover); color: var(--btn-fg-hover); }
@@ -58,10 +55,12 @@ input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible
 table { width: 100%; border-collapse: collapse; }
 th { text-align: left; text-transform: capitalize; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--muted); padding: 7px 10px; border-bottom: 1px solid var(--line); }
 th.mono { font-family: inherit; font-size: var(--text-sm); }
-th button.sort { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: baseline; }
+th button.sort { all: unset; cursor: pointer; display: inline-flex; gap: 4px; align-items: baseline; padding-block: 2px; }
+/* every control is at least 24px high (WEB-66) */
+summary { min-height: 24px; }
 th button.sort:hover, th button.sort:focus-visible { color: var(--fg); background: none; }
 th button.sort:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-th .arrow { font-size: 9px; min-width: 9px; }
+th .arrow { font-size: var(--text-meta); min-width: 1em; }
 th.num button.sort { flex-direction: row-reverse; }
 td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: baseline; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
@@ -69,7 +68,7 @@ td a { text-decoration: none; }
 td a:hover { text-decoration: underline; }
 td.wrap { overflow-wrap: anywhere; }
 td.test-ids, th.test-ids { width: 12rem; min-width: 6rem; }
-kbd { font: var(--text-sm)/1 var(--mono); color: var(--muted); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 1px 4px; margin-left: 3px; vertical-align: 1px; }
+kbd { font: var(--text-kbd)/1 var(--mono); letter-spacing: .01em; color: var(--muted); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 1px 4px; margin-left: 3px; vertical-align: 1px; }
 .empty { padding: 24px 0; text-align: center; }
 /* RFC 2119 level chip in rendered Markdown. */
 .rfc { display: inline-block; }

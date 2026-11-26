@@ -2,16 +2,16 @@
    Theme: `auto` follows the OS; data-theme="light|dark" on <html> forces one. Every colour is a light-dark() pair. */
 :root {
   color-scheme: light dark;
-  --bg: light-dark(#f5f6f8, #232830);
-  --card: light-dark(#ffffff, #2a303a);
-  --tooltip-bg: light-dark(#efede7, #403e39);
-  --raised: light-dark(#eef0f4, #343c48);
-  --fg: light-dark(#1a1d23, #e9ebef);
-  --muted: light-dark(#596273, #b3bdcb);
-  --line: light-dark(#dde1e8, #495463);
+  --bg: light-dark(#fafaf8, #121212);
+  --card: light-dark(#ffffff, #1e1e1e);
+  --tooltip-bg: light-dark(#efede7, #33312d);
+  --raised: light-dark(#f0f0ec, #2a2a2a);
+  --fg: light-dark(#1f2328, #e0e0e0);
+  --muted: light-dark(#555e6b, #b8b8b8);
+  --line: light-dark(#e2e2dd, #383838);
   --accent: light-dark(#6d3bd2, #b69cff);
   --ok: light-dark(#13693d, #4ade80);
-  --line-strong: light-dark(#838da0, #7b8696); /* control borders: >= 3:1 (WCAG 1.4.11) */
+  --line-strong: light-dark(#838b96, #808080); /* control borders: >= 3:1 (WCAG 1.4.11) */
   --warn: light-dark(#8a5a00, #f0c674);
   --bad: light-dark(#a3262e, #ff9a9a);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -20,6 +20,21 @@
   --accent-3: light-dark(#8f5314, #f0b070); /* amber: quotes, anchors */
   --info: light-dark(#355676, #acc5dd);
   --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* type scale, in rem so a text-size setting and the browser's own both scale it. 13px is the floor; 12px is for keyboard hints only. */
+  --text-kbd: .75rem;
+  --text-meta: .8125rem;
+  --text-sm: .875rem;
+  --text-label: .9375rem; /* table rows */
+  --text-body: 1rem;
+  --text-section: 1.125rem;
+  --text-title: 1.25rem;
+  --text-page: 1.5rem;
+  --leading: 1.5;
+  --leading-tight: 1.4; /* table cells and labels */
+  --measure: 70ch; /* the longest line of prose */
+  /* rows: comfortable by default; compact (data-density) changes padding and height, never type */
+  --row-h: 2.75rem;
+  --cell-pad-y: .5rem;
   /* fixed two-tone ramp (same in light and dark, so a requirement keeps its meaning on every surface): tone, pill ink, pill fill */
   --plum: #a84289; --plum-ink: #732253; --plum-fill: #f0bee0;
   --blue: #347ac1; --blue-ink: #194879; --blue-fill: #b8d8f7;
@@ -47,5 +62,6 @@
   --input-pad: 6px 10px;
   --focus-ring: 2px solid var(--accent);
 }
+:root[data-density="compact"] { --row-h: 2.25rem; --cell-pad-y: .25rem; }
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] { color-scheme: dark; }

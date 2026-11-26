@@ -2,8 +2,9 @@
   import { tick } from "svelte";
   import type { Tone } from "$lib/tone";
   import { additive, step } from "./seg";
+  import Icon, { type IconName } from "./Icon.svelte";
 
-  type Opt = { key: string; label: string; count?: number; tone?: Tone; title?: string };
+  type Opt = { key: string; label: string; count?: number; tone?: Tone; icon?: IconName; title?: string };
   // Single-choice groups select with arrows. Multi-choice groups use toggle buttons; a click with Shift, Ctrl or ⌘ held says `additive`.
   let { label, keycap, hint, options, value, selected, nowrap = false, onpick }: { label: string; keycap?: string; hint?: string; options: Opt[]; value?: string; selected?: string[]; nowrap?: boolean; onpick: (key: string, additive?: boolean) => void } = $props();
   const picked = (key: string) => selected ? selected.includes(key) : value === key;
@@ -23,7 +24,7 @@
 <div class="seg" class:nowrap role={selected ? "group" : "radiogroup"} aria-label={label} title={hint} bind:this={bar}>
   <span class="name" aria-hidden="true">{label}{#if keycap}{" "}<kbd>{keycap}</kbd>{/if}</span>
   {#each options as o, i (o.key)}
-    <button type="button" role={selected ? undefined : "radio"} class:zero={o.count === 0 && !picked(o.key)} aria-pressed={selected ? picked(o.key) : undefined} aria-checked={selected ? undefined : picked(o.key)} tabindex={selected || stop(i) ? 0 : -1} title={o.title} onclick={(e) => onpick(o.key, additive(e))} onkeydown={arrow}>{#if selected}<span class="check" aria-hidden="true">✓</span>{/if}{#if o.tone}<i class="dot" data-tone={o.tone}></i>{/if}<span class="text" data-text={o.label}>{o.label}</span>{#if o.count !== undefined}{" "}<b>{o.count}</b>{/if}</button>
+    <button type="button" role={selected ? undefined : "radio"} class:zero={o.count === 0 && !picked(o.key)} aria-pressed={selected ? picked(o.key) : undefined} aria-checked={selected ? undefined : picked(o.key)} tabindex={selected || stop(i) ? 0 : -1} title={o.title} onclick={(e) => onpick(o.key, additive(e))} onkeydown={arrow}>{#if selected}<span class="check" aria-hidden="true">✓</span>{/if}{#if o.icon}<i class="glyph" data-tone={o.tone}><Icon name={o.icon} /></i>{:else if o.tone}<i class="dot" data-tone={o.tone}></i>{/if}<span class="text" data-text={o.label}>{o.label}</span>{#if o.count !== undefined}{" "}<b>{o.count}</b>{/if}</button>
   {/each}
 </div>
 
@@ -45,5 +46,6 @@
   button[aria-pressed=true] .check { visibility: visible; }
   button.zero { color: var(--muted); }
   b { font-weight: var(--weight-medium); font-variant-numeric: tabular-nums; margin-left: 2px; }
+  .glyph { display: inline-block; margin-right: 5px; vertical-align: middle; color: var(--tone, var(--muted)); }
   .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 6px 1px 0; background: var(--tone, var(--muted)); }
 </style>

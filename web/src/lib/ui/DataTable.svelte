@@ -83,7 +83,7 @@
 
   // ↑/↓ move through the stops, ←/→ collapse and expand the selected group (not while a field or a radio group has the keys)
   function onkey(e: KeyboardEvent) {
-    if (!keys || (e.target !== document.body && !table?.contains(e.target as Node)) || (e.target as HTMLElement).closest("input, select, textarea, .gutter, .seg") || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!keys || (e.target !== document.body && !table?.contains(e.target as Node)) || (e.target as HTMLElement).closest("input, select, textarea, .gutter, .seg, [popover]") || e.metaKey || e.ctrlKey || e.altKey) return;
     const grp = curGroup();
     if ((e.key === "ArrowDown" || e.key === "ArrowUp") && seq.length) {
       e.preventDefault();
@@ -146,7 +146,7 @@
         {#if isOpen(g.name)}
           {#each g.rows as r (rowKey(r))}
             <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-            <tr class="row" class:sel={selected === rowKey(r)} data-tone={tone?.(r)} onclick={(e) => { if ((e.target as HTMLElement).closest("a, input, button")) return; selGroup = null; onselect(rowKey(r), "click"); }}>
+            <tr class="row" class:sel={selected === rowKey(r)} data-tone={tone?.(r)} onclick={(e) => { if ((e.target as HTMLElement).closest("a, input, button, label, [popover]")) return; selGroup = null; onselect(rowKey(r), "click"); }}>
               {#each columns as c}<td class={c.cls}>{@render cell(r, c.key)}</td>{/each}
             </tr>
           {/each}

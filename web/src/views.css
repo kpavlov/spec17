@@ -1,0 +1,101 @@
+/* Classes several views share (app.css has the elements and tokens). Styles one component owns live in that component. */
+.grow { flex: 1; }
+button:disabled { opacity: 0.5; cursor: default; }
+
+/* header controls (a.tab is also the banner button) */
+a.tab { color: var(--fg); background: var(--raised); text-decoration: none; border-radius: var(--radius); padding: 5px 12px; font-size: var(--text-label); text-transform: capitalize; }
+a.tab:hover { background: var(--tint-btn); color: var(--accent); }
+a.tab.on { background: var(--tint-on); color: var(--accent); font-weight: var(--weight-semibold); }
+.badge { display: inline-block; min-width: 18px; margin-left: 6px; padding: 0 5px; border-radius: 2px; font-size: var(--text-sm); font-weight: var(--weight-semibold); line-height: 1.3; text-align: center; color: var(--card); background: var(--tone); }
+a.tab.on .badge { outline: 1px solid var(--raised); }
+
+/* blocks and headings */
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+.block { margin-bottom: 10px; }
+.note-line { font-size: var(--text-sm); margin: 0 0 12px; }
+.note { font-size: var(--text-sm); margin: 10px 0 0; }
+.note, .note-line, .refs li { max-width: var(--measure); }
+.preview-section { margin: 14px 0 4px; font-size: var(--text-body); }
+main h2 { margin: 18px 0 6px; font-size: var(--text-section); }
+main h2.mono { font-size: var(--text-title); }
+details.plain { margin: 12px 0 0; padding: 6px 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+details.plain pre, pre.log { margin: 0; white-space: pre-wrap; word-break: break-word; }
+pre.log { margin-top: 12px; padding: 10px 14px; background: var(--raised); border-radius: var(--radius); font-family: var(--mono); font-size: var(--text-sm); }
+.refs { margin: 0; padding-left: 16px; font-size: var(--text-sm); }
+.refs a { text-decoration: none; }
+.refs a:hover { text-decoration: underline; }
+
+/* toolbars */
+.bar { display: flex; gap: var(--gap); align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+.bar input:not([type=checkbox]) { flex: 1; min-width: 200px; }
+.bar input[type=checkbox] { padding: 0; margin: 0; }
+.bar label { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; cursor: pointer; }
+.req-toolbar { flex-wrap: nowrap; gap: 8px; }
+.cycle-group { display: inline-block; margin-left: 0.75em; }
+.req-toolbar input:not([type=checkbox]) { min-width: 0; }
+.req-toolbar .found:empty { display: none; }
+.filter-toggle { display: inline-flex; align-items: center; gap: 8px; padding-inline: 8px; white-space: nowrap; }
+.req-toolbar :is(.found, .clear-filters, .filter-toggle) { font-size: var(--text-sm); }
+.req-options { position: fixed; inset: auto; margin: 0; width: max-content; max-width: min(52rem, calc(100vw - 16px)); max-height: min(60dvh, 30rem); overflow: auto; padding: 10px 12px; background: var(--card); color: var(--fg); border: 1px solid var(--line-strong); border-radius: var(--radius); }
+.req-options:popover-open { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.req-options > div:not(.seg) { min-width: 0; max-width: 100%; }
+.req-options select { align-self: stretch; min-width: 12rem; max-width: 100%; text-overflow: ellipsis; }
+.filter-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: -6px 0 10px; }
+.filter-chip { display: inline-flex; align-items: stretch; min-width: 0; max-width: 100%; border-radius: var(--badge-radius); color: var(--pill-ink, var(--fg)); background: var(--pill-fill, var(--tint-on)); }
+.filter-chip button { display: grid; place-items: center; min-height: 24px; min-width: 0; border: 0; background: transparent; color: inherit; font-size: var(--text-sm); line-height: 1.2; padding: 2px 4px 2px 8px; overflow-wrap: anywhere; }
+.filter-chip button:last-child { flex: 0 0 24px; padding: 0; font-size: 1rem; line-height: 1; }
+.filter-chip button:hover:not(:disabled) { background: color-mix(in srgb, currentColor 12%, transparent); color: inherit; }
+.filter-toggle:is([aria-pressed=true], [aria-expanded=true]) { background: var(--tint-on); color: var(--accent); }
+.filter-toggle .n { margin-inline-start: 2px; font-variant-numeric: tabular-nums; font-weight: var(--weight-semibold); color: var(--accent); }
+@media (max-width: 48rem) { .req-toolbar { flex-wrap: wrap; } .req-toolbar input:not([type=checkbox]) { flex-basis: 100%; } }
+
+/* requirement lists (WEB-43): one line a row, the text takes what the other columns leave */
+.req-list { container-type: inline-size; }
+.req-list td:is(.req-id, .req-status, .req-text, .req-loc) { height: var(--row-h); padding-block: var(--cell-pad-y); vertical-align: middle; font-size: var(--text-label); }
+.req-list td.mono { font-size: var(--text-sm); }
+.req-list td:is(.req-id, .req-status, .req-loc) { width: 1%; white-space: nowrap; }
+.req-list td.req-text { width: 100%; max-width: 0; }
+.req-status .metadata { flex-wrap: nowrap; }
+.req-list :is(.req-id, .req-loc, .notes) a { display: inline-flex; align-items: center; min-height: 24px; }
+/* too narrow for the location: the preview names it (WEB-65) */
+@container (max-width: 52rem) { .req-list :is(td, th).req-loc { display: none; } }
+/* phones: ID and status on one line, the text on the next; the headers stay, to sort by */
+@container (max-width: 34rem) {
+  .req-list :is(table, thead, tbody, tr.grp, tr.grp td) { display: block; }
+  .req-list :is(thead tr, tr.row) { display: flex; flex-wrap: wrap; align-items: center; }
+  .req-list tr.row { border-bottom: 1px solid var(--line); }
+  .req-list :is(thead tr, tr.row) :is(th, td) { width: auto; min-width: 0; }
+  .req-list tr.row td { border-bottom: 0; }
+  .req-list tr.row td.req-status { flex: 1; overflow-x: auto; }
+  .req-list tr.row td.req-text { flex-basis: 100%; max-width: 100%; height: auto; padding-top: 0; }
+}
+
+/* list and preview are panes that scroll on their own: side by side (wide screens, default) or stacked (.h, and always on narrow screens) */
+aside.stale { opacity: .55; }
+.page { display: flex; flex-direction: column; height: calc(100dvh - 6.25rem); min-height: 440px; }
+@media (max-width: 48rem) { .content .page { height: calc(100dvh - 9.375rem); } }
+.doc { flex: 1; min-width: 0; overflow: auto; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px 14px; box-shadow: var(--shadow); }
+.docs { display: flex; flex: 1; min-height: 0; gap: var(--gap); }
+.tree { flex: 0 0 15rem; min-height: 0; padding: 10px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+@media (max-width: 62rem) { .docs { flex-direction: column; } .tree { flex-basis: auto; max-height: 12rem; } }
+/* a trace panel outside a split (overlap) is a floating card; inside one, Split draws the card */
+aside.float { position: sticky; top: calc(var(--header-h) + .75rem); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 16px 14px; overflow: auto; max-height: calc(100vh - 5rem); box-shadow: var(--shadow); }
+
+/* code */
+.crumb { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 8px; }
+table.code { display: block; max-width: 100%; overflow-x: auto; font-family: var(--mono); font-size: var(--text-sm); background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+table.code td { border: none; padding: 0 10px; white-space: pre; }
+table.snip { margin-top: 4px; }
+td.ln { text-align: right; width: 1%; user-select: none; }
+td.ln a { color: var(--muted); }
+tr.hl { background: color-mix(in srgb, var(--warn) 22%, transparent); }
+td.src { overflow-x: auto; font-size: var(--text-label); }
+table.code.wrap td.src { white-space: pre-wrap; overflow-wrap: anywhere; }
+/* highlight.js token colours (the markup comes from {@html}) */
+.hljs-comment, .hljs-quote { color: var(--muted); font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-literal, .hljs-built_in, .hljs-doctag { color: var(--accent); }
+.hljs-string, .hljs-regexp, .hljs-addition { color: var(--ok); }
+.hljs-number, .hljs-symbol, .hljs-bullet, .hljs-meta { color: var(--warn); }
+.hljs-title, .hljs-section, .hljs-attr, .hljs-attribute, .hljs-name { color: var(--info); }
+.hljs-type, .hljs-class .hljs-title { color: var(--accent-2); }
+.hljs-deletion { color: var(--bad); }

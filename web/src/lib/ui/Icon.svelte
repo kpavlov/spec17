@@ -1,4 +1,4 @@
-<script lang="ts">
+<script module lang="ts">
   // small outline icons (24px grid, stroke = currentColor); size follows the font
   const PATHS = {
     dashboard: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/>',
@@ -19,8 +19,20 @@
     "x-circle": '<circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/>',
     "collapse": '<path d="m11 17-5-5 5-5"/><path d="m18 17-5-5 5-5"/>',
     "expand": '<path d="m6 17 5-5-5-5"/><path d="m13 17 5-5-5-5"/>',
+    code: '<path d="m16 18 6-6-6-6"/><path d="m8 6-6 6 6 6"/>',
+    person: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+    clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/>',
+    question: '<circle cx="12" cy="12" r="9"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
+    trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6"/>',
+    check: '<path d="m5 12 5 5L20 7"/>',
+    "check-alert": '<path d="m3 13 4 4 8-9"/><path d="M20 7v6M20 17h.01"/>',
   };
-  let { name }: { name: keyof typeof PATHS } = $props();
+  export type IconName = keyof typeof PATHS;
+</script>
+
+<script lang="ts">
+  let { name }: { name: IconName } = $props();
 </script>
 
 <svg viewBox="0 0 24 24" width="1.25em" height="1.25em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">{@html PATHS[name]}</svg>

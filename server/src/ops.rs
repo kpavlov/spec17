@@ -561,5 +561,5 @@ pub fn stamp(root: Option<&Path>) -> u64 {
 /// What the dashboard shows in its header.
 pub fn info(root: Option<&PathBuf>) -> Result<Value, String> {
     let p = spec17_core::scan::Project::open(root.map(|r| r.as_path()))?;
-    Ok(json!({"root": p.root, "note": NOTE}))
+    Ok(json!({"root": p.root, "branch": p.branch(), "note": NOTE}))
 }

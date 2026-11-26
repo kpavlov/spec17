@@ -15,6 +15,8 @@
 
 <style>
   .md { line-height: 1.55; overflow-wrap: anywhere; }
+  /* (WEB-43) running text stops at the measure; tables and code take the width they need */
+  .md :global(:is(p, li, h1, h2, h3, h4, h5, h6, blockquote)) { max-width: var(--measure); }
   .md :global(h1) { font-size: var(--text-title); margin: 20px 0 8px; }
   .md :global(h2) { font-size: var(--text-section); margin: 18px 0 6px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
   .md :global(h3), .md :global(h4), .md :global(h5), .md :global(h6) { font-size: var(--text-body); margin: 14px 0 4px; }

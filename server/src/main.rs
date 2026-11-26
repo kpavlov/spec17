@@ -497,6 +497,17 @@ mod tests {
         d
     }
 
+    #[test]
+    fn info_names_the_branch_only_in_a_git_work_tree() {
+        // shortcut: assumes the temp dir is outside any git work tree, set TMPDIR elsewhere if it is not
+        assert!(crate::ops::info(Some(&repo())).unwrap()["branch"].is_null());
+        let d = std::env::temp_dir().join(format!("spec17-branch-{}", std::process::id()));
+        std::fs::create_dir_all(d.join("specs")).unwrap();
+        assert!(std::process::Command::new("git").args(["init", "-q", "-b", "trunk"]).current_dir(&d).status().unwrap().success());
+        assert_eq!(crate::ops::info(Some(&d)).unwrap()["branch"], "trunk");
+        std::fs::remove_dir_all(&d).unwrap();
+    }
+
     async fn send(app: &Router, req: Request<Body>) -> (StatusCode, String) {
         let r = app.clone().oneshot(req).await.unwrap();
         let st = r.status();
