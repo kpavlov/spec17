@@ -351,6 +351,19 @@ fn comment_tag_inside_a_test_belongs_to_that_test() {
     assert_eq!(a.tests_view().modules[0].files[0].tests[0].ids, ["DEM-01"]);
 }
 
+#[doc = "[SCAN-35]"]
+#[test]
+fn rust_doc_tag_counts_above_and_below_the_test_attribute() {
+    let d = scratch("rust-doc-tag-order");
+    write(&d, "spec17.json", r#"{"tests":["tests"],"ext":["rs"]}"#);
+    write(&d, "SPEC.md", "- DEM-01 MUST — a.\n- DEM-02 MUST — b.\n");
+    write(&d, "tests/a.rs", "#[doc = \"[DEM\x2D01]\"]\n#[test]\nfn above() {\n    assert!(true);\n}\n\n#[test]\n#[doc = \"[DEM\x2D02]\"]\nfn below() {\n    assert!(true);\n}\n");
+    let a = Analysis::load(Some(&d)).unwrap();
+    assert!(a.report().invalid_tests["comment-only"].is_empty());
+    let cases = &a.tests_view().modules[0].files[0].tests;
+    assert_eq!(cases.iter().map(|c| (c.name.as_str(), c.ids.join(","))).collect::<Vec<_>>(), [("above", "DEM\x2D01".to_string()), ("below", "DEM\x2D02".to_string())]);
+}
+
 #[doc = "[SCAN-36]"]
 #[test]
 fn report_distinguishes_attached_and_orphan_comment_tags() {

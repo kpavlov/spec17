@@ -5,10 +5,10 @@
     /* Self-contained: an image cannot read the page's CSS, so these are copies of the docs/static/tokens.css values (same names). Change the palette there, then here. */
     :root {
       color-scheme: light dark;
-      --card: light-dark(#ffffff, #2a303a);
-      --fg: light-dark(#1a1d23, #e9ebef);
-      --muted: light-dark(#596273, #b3bdcb);
-      --accent: light-dark(#6d3bd2, #b69cff);
+      --card: light-dark(#ffffff, #2f343e);
+      --fg: light-dark(#1f2328, #dce0e5);
+      --muted: light-dark(#555e6b, #bcc2cc);
+      --accent: light-dark(#7222e6, #c6b2ff);
       --accent-2: light-dark(#0e6f65, #5fd0bf);
     }
     .background { fill: var(--card); }

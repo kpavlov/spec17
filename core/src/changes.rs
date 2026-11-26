@@ -187,6 +187,12 @@ impl Project {
         Ok(out)
     }
 
+    // (WEB-66)
+    /// The checked-out branch; `None` on a detached HEAD or outside a git work tree.
+    pub fn branch(&self) -> Option<String> {
+        self.git(&["branch", "--show-current"]).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+    }
+
     // (SCAN-20)
     /// The commits of `head` (HEAD) that are not on `base` (the first of main, master, origin/main, origin/master that exists when
     /// empty), newest first. Without a base, or when `head` is on it, the last `limit` commits of `head` (`on_base`).

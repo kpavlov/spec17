@@ -8,6 +8,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ if .IsHome }}{{ site.Title }}: spec-driven-development evidence{{ else }}{{ .Title }} · {{ site.Title }}{{ end }}</title>
   <meta name="description" content="{{ .Description | default site.Params.description }}">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27%3E%3Crect width=%2716%27 height=%2716%27 rx=%273%27 fill=%27%23a100ff%27/%3E%3Cpath d=%27M4 8.5l2.5 2.5L12 5%27 stroke=%27white%27 stroke-width=%271.8%27 fill=%27none%27/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="{{ "tokens.css" | relURL }}">
   <link rel="stylesheet" href="{{ "style.css" | relURL }}">
   <link rel="stylesheet" href="{{ "syntax.css" | relURL }}">
@@ -16,8 +17,21 @@
   <script src="{{ "toc.js" | relURL }}" defer></script>
   <script src="{{ "copy.js" | relURL }}" defer></script>
   <script src="{{ "screenshots.js" | relURL }}" defer></script>
+  {{- $analytics := or site.Params.gtm site.Config.Services.GoogleAnalytics.ID }}
+  {{- if $analytics }}
+  {{/* (NFR-19) a template is inert: consent.js runs these scripts after Accept */}}
+  <template id="analytics">{{ partial "google_analytics.html" . }}</template>
+  <script src="{{ "consent.js" | relURL }}" data-gtm="{{ site.Params.gtm }}" defer></script>
+  {{- end }}
 </head>
 <body>
+  {{- if $analytics }}
+  {{/* (NFR-20) first in the page, so the keyboard reaches it first */}}
+  <section id="consent" aria-label="Cookie consent" hidden>
+    <p>May IT Staff OÜ use Google Analytics cookies to measure visits? Data goes to Google and may be processed outside the EU. You can withdraw under Cookie settings in the footer. <a href="{{ (site.GetPage "/cookies").RelPermalink }}">Cookie policy</a> · <a href="{{ (site.GetPage "/privacy").RelPermalink }}">Privacy policy</a></p>
+    <div><button type="button" data-consent="denied">Reject</button><button type="button" data-consent="granted">Accept</button></div>
+  </section>
+  {{- end }}
   <header>
     <a class="brand" href="{{ site.Home.RelPermalink }}">spec17</a>
     <div class="search">
@@ -57,17 +71,22 @@
       </div>
       {{ end }}
       {{ .Content }}
-      {{ $i := 0 }}{{ range $k, $p := $all }}{{ if eq $p $cur }}{{ $i = $k }}{{ end }}{{ end }}
+      {{ $i := -1 }}{{ range $k, $p := $all }}{{ if eq $p $cur }}{{ $i = $k }}{{ end }}{{ end }}
+      {{ if ge $i 0 }}{{/* the policy pages are not in the list */}}
       <div class="pager">
         {{ if gt $i 0 }}{{ with index $all (sub $i 1) }}<a rel="prev" href="{{ .RelPermalink }}">← {{ if .IsHome }}Overview{{ else }}{{ .LinkTitle }}{{ end }}</a>{{ end }}{{ end }}
         {{ if lt (add $i 1) (len $all) }}{{ with index $all (add $i 1) }}<a rel="next" href="{{ .RelPermalink }}">{{ .LinkTitle }} →</a>{{ end }}{{ end }}
       </div>
+      {{ end }}
     </main>
     {{/* (NFR-17) */}}
     <footer>
       <div>Tags and citations show where requirements are referenced. spec17 does not run tests.</div>
       <div>Copyright &copy; 2026 Konstantin Pavlov, <a href="https://itstaff.ee/">IT Staff OÜ</a>. All rights reserved.</div>
-      <div><a class="contact" href="mailto:info@itstaff.ee">Contact</a> · <a href="https://github.com/kpavlov/spec17/issues">Feedback</a></div>
+      <div>
+        <a class="contact" href="mailto:info@itstaff.ee">Contact</a> · <a href="https://github.com/kpavlov/spec17/issues">Feedback</a>
+        {{ with site.GetPage "/privacy" }}<a href="{{ .RelPermalink }}">{{ .Title }}</a>{{ end }} · {{ with site.GetPage "/cookies" }}<a href="{{ .RelPermalink }}">{{ .Title }}</a>{{ end }}{{ if $analytics }} · <button id="cookie-settings" type="button" hidden>Cookie settings</button>{{ end }}
+      </div>
     </footer>
   </div>
   <dialog id="screenshot-viewer" aria-label="Screenshot viewer" aria-describedby="screenshot-viewer-help">

@@ -2,6 +2,15 @@ baseURL = "https://spec17.dev/"
 title = "spec17"
 disableKinds = ["section", "taxonomy", "term", "rss"]
 
+[params]
+  gtm = "GTM-MTTQ6B2P" # (NFR-19) Google Tag Manager container; loaded only after consent
+
+[services.googleAnalytics]
+  id = "G-GQXY8SX524" # Hugo's embedded snippet; held back until consent (layouts/all.html, static/consent.js)
+
+[privacy.googleAnalytics]
+  respectDoNotTrack = false # the banner's explicit choice decides, for the snippet and Tag Manager alike
+
 [module.hugoVersion]
   min = "0.146.0" # layouts/all.html
 

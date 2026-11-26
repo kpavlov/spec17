@@ -11,8 +11,21 @@ export const priorityTone = (priority: string): Tone => {
 };
 export const effortTone = (effort: string): Tone => ({ XXXS: "cyan", XXS: "cyan", XS: "cyan", S: "teal", M: "blue", L: "orange", XL: "red", XXL: "red", XXXL: "red" })[effort.toUpperCase()] as Tone ?? "muted";
 
-// what the scanner saw per requirement state
-export const stateTone: Record<string, Tone> = { tested: "cyan", "src-only": "orange", none: "red", done: "celery", manual: "teal", later: "indigo", ref: "brown" };
+// what the scanner saw per requirement state; (WEB-64) each has its own colour and its own icon shape
+export const stateTone: Record<string, Tone> = { tested: "cyan", "src-only": "orange", none: "red", manual: "teal", later: "indigo", ref: "brown", unknown: "muted", deleted: "red" };
+// a flask, not a check mark, for a tagged test: the scanner does not know that it passes
+export const stateIcon = { tested: "tests", "src-only": "code", none: "alert", manual: "person", later: "clock", ref: "book", unknown: "question", deleted: "trash" } as const;
+// a check mark in the spec is the author's claim; the verdict says what the scanner found behind it. Text before " — " is the accessible name
+const VERDICTS: Record<string, string> = {
+  "NO-TEST": "Marked done, no tagged test — the spec line has a check mark, but no test carries its [ID] tag (NO-TEST)",
+  "NO-LINK": "Marked done, tests not linked to code — the CodeGraph index shows no link from its tagged tests to application code (NO-LINK)",
+  ok: "Marked done, tests linked to code — the CodeGraph index links its tagged tests to application code; run the suite to know they pass",
+  unchecked: "Marked done, links not checked — it has a tagged test; without a usable CodeGraph index, test-to-code links are not checked",
+};
+export const verdictMark = (verdict: string) => {
+  const unproven = verdict === "NO-TEST" || verdict === "NO-LINK";
+  return { title: VERDICTS[verdict] ?? `Marked done — ${verdict}`, icon: unproven ? "check-alert" : "check", tone: unproven ? "orange" : verdict === "ok" ? "celery" : "muted" } as const;
+};
 // the row edge shows only the states that carry a verdict
 export const edgeTone = (state: string): Tone | undefined => (["orange", "red"].includes(stateTone[state]) ? stateTone[state] : undefined);
 // setup and doctor statuses

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, tick } from "svelte";
   import IdLink from "$lib/ui/IdLink.svelte";
+  import { place } from "$lib/ui/place";
 
   let { id, href, getText }: { id: string; href: string; getText: (id: string) => Promise<string> } = $props();
   const tipId = $props.id();
@@ -26,15 +27,12 @@
       open = true;
       tip.showPopover();
       await tick();
-      const box = trigger.getBoundingClientRect();
-      tip.style.left = Math.max(8, Math.min(box.left, innerWidth - tip.offsetWidth - 8)) + "px";
-      tip.style.top = (box.bottom + tip.offsetHeight + 4 <= innerHeight ? box.bottom : Math.max(4, box.top - tip.offsetHeight)) + "px";
+      place(tip, trigger);
       const result = await getText(id);
       if (sequence === current) {
         text = result;
         await tick();
-        tip.style.left = Math.max(8, Math.min(box.left, innerWidth - tip.offsetWidth - 8)) + "px";
-        tip.style.top = (box.bottom + tip.offsetHeight + 4 <= innerHeight ? box.bottom : Math.max(4, box.top - tip.offsetHeight)) + "px";
+        place(tip, trigger);
       }
     }, 500);
   }
@@ -59,5 +57,5 @@
 
 <style>
   .preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 5; line-clamp: 5; overflow: hidden; overflow-wrap: anywhere; }
-  [popover] { position: fixed; inset: auto; margin: 0; max-width: min(24rem, calc(100vw - 16px)); white-space: normal; padding: 6px 10px; background: var(--tooltip-bg); color: var(--fg); border: 1px solid var(--muted); border-radius: var(--radius); font: var(--text-sm)/1.5 system-ui, sans-serif; }
+  [popover] { position: fixed; inset: auto; margin: 0; max-width: min(24rem, calc(100vw - 16px)); white-space: normal; padding: 6px 10px; background: var(--tooltip-bg); color: var(--fg); border: 1px solid var(--muted); border-radius: var(--radius); font: var(--text-sm)/1.5 var(--sans); }
 </style>

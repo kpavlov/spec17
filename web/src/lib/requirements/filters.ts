@@ -31,3 +31,29 @@ export function pickValue(values: Value[], value: Value, additive: boolean): Val
 export function matches(values: Value[], value: Value): boolean {
   return !values.length || values.includes(value);
 }
+
+// (WEB-70) `state:none level:must text`: the words that name a facet and one of its `choices` (facet → values), and the text left over.
+function wordValue(key: string, word: string, choices: Record<string, Value[]>): Value | undefined {
+  if (!Object.hasOwn(choices, key)) return undefined;
+  const flag = key === "changed" || key === "reviewed";
+  if (flag) return word === "yes" ? "1" : word === "no" ? "0" : undefined;
+  if (word === "none" && (key === "priority" || key === "effort")) return null;
+  return choices[key].find((v): v is string => v !== null && v.toLowerCase() === word);
+}
+export function parseQuery(text: string, choices: Record<string, Value[]>): { picked: [string, Value][]; rest: string } {
+  const picked: [string, Value][] = [], left: string[] = [];
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const [, key, raw] = /^([^:]+):(.+)$/.exec(word) ?? [];
+    const value = key ? wordValue(key.toLowerCase(), raw.toLowerCase(), choices) : undefined;
+    if (value === undefined) left.push(word); else picked.push([key.toLowerCase(), value]);
+  }
+  // text with no filter word is left exactly as typed
+  return { picked, rest: picked.length ? left.join(" ") : text };
+}
+// the picked words added to what their facets have selected; `choices` is all a facet offers, so all of them selected is All
+export function mergePicked(picked: [string, Value][], selected: (key: string) => Value[], choices: (key: string) => Value[]): Record<string, string | undefined> {
+  return Object.fromEntries([...new Set(picked.map(([key]) => key))].map((key) => {
+    const values = [...new Set([...selected(key), ...picked.filter(([k]) => k === key).map(([, v]) => v)])];
+    return [key, writeValues(collapseAll(values, choices(key)))];
+  }));
+}

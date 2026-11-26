@@ -1,5 +1,35 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- Dashboard and Changes sections resize by dragging the gap below them (up-down cursor; ↑/↓ and Home from the keyboard, double-click to reset). This replaces the small corner grip, and Dashboard sections now remember their height and open state too.
+- Dashboard and docs: calmer, higher-contrast light and dark palette with an automated WCAG and APCA check; one type scale with a 13px floor.
+- Show each evidence state as a colour-coded icon with its own shape; its name and meaning are on hover, focus and tap, and the state filter doubles as the key. A check mark in a spec with no tagged test, or none linked to code, gets its own orange icon.
+- Keep requirement rows to one line, with status in its own column, long locations cut in the middle (full path on hover or focus, with a copy button), and several change reasons folded into one pill.
+- Replace the always-open filter rows with a "+ Filter" menu and a chip per selected value, on Requirements, Changes and Tests. The menu starts closed.
+- Head every page with the repository name, git branch (each with its own icon, apart from the product name) and scan age (`/api/info` now includes `branch`); cap running text outside requirement lists at 70 characters a line.
+- Rebuild the Dashboard around a summary strip and one problem list grouped into errors and collapsed warnings. Specs to compare are now listed; before, they counted in the total but were not shown.
+- Add display settings: row density, text size and theme. Make the dark theme a lighter blue-grey, like Zed's One Dark, and the light theme's violet accent more saturated.
+- Add a vivid brand violet for the product name in the dashboard and docs headers and for the browser tab icon.
+- Docs site: fonts, product name, tab icon, theme button, keyboard hints and menu highlight now match the dashboard. The table of contents sits close under its page, without a second scroll area, and marks the current section on a neutral line. Text uses its type scale one step larger, and the stripe along the top is the brand violet.
+- Add a command palette (⌘K or Ctrl+K) over views, actions, saved views and requirement IDs.
+- Turn `state:none level:must` words in the requirement search into filters on Enter.
+- Save search-and-filter views per repository. This upgrades the browser database: an older spec17 served on the same port can then no longer load its reviewed marks (releases up to 0.5.0 offer no reset; clear the site's data).
+- Offer to reset the browser database when it cannot be used (made by a newer spec17, incomplete or unreadable). Nothing is deleted before you confirm.
+- Never make a Dashboard or Changes block taller than its content: a dragged height is now a limit.
+- Say in Settings what CodeGraph is, with a link to its project.
+
+### Fixed
+
+- Dashboard: a late or failed answer no longer replaces a newer one (open requirement, source preview, blame, changes, commits and modules; saved views changed while storage was still answering).
+- "Open in" links of the VS Code family and Zed now work for paths containing `#`, `?` or `%`.
+- Test filter chips no longer break for a module named `tagged`, `untagged` or `changed`.
+- Selected and hovered navigation items and buttons reach 4.5:1 text contrast in both themes; their tints are fainter.
+- Marking or clearing a requirement as reviewed no longer overwrites marks saved from another tab.
+- Collapsing or expanding a table group no longer overwrites groups another tab saved.
+
 ## 0.5.0
 
 - Report a skill that is in no skills folder as information, not a warning: clients with MCP Skills support, such as Claude Code (`/spec17:spec17`), load it from the spec17 server. It no longer shows a banner or a badge, or opens Settings on a first run.

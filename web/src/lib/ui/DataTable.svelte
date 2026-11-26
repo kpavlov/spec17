@@ -2,7 +2,8 @@
   import type { Snippet } from "svelte";
   import { sorted, toggleSort, type Sort } from "$lib/sort";
   import { layout } from "$lib/layout/layout.svelte";
-  import { db, run } from "$lib/db.svelte";
+  import { db, run, update } from "$lib/db.svelte";
+  import { applyOpen } from "$lib/collapsed";
 
   type Col = { key: string; label: string; cls?: string; sort?: boolean };
   // a keyboard stop: a row (by key) or a group header
@@ -43,29 +44,27 @@
 
   // (WEB-13, WEB-52) Collapsed groups are remembered per browser and root (IndexedDB); everything starts expanded.
   let collapsed = $state<string[]>([]);
-  // toggles made before the saved groups have loaded (group → open): they win over the saved state, which is written once it is in
+  // toggles made before the saved groups have loaded (group → open): they win over the saved state, and are stored once it is in
   const touched = new Map<string, boolean>();
   let loaded = false;
   const dbKey = () => `${db.root}\n${storageKey}`;
-  const save = () => run("collapsed", "readwrite", (st) => st.put($state.snapshot(collapsed), dbKey())).catch(() => { /* storage blocked */ });
+  // only the toggles go onto the stored record, not this table's copy over it: another tab may have saved since
+  const save = (edits: Map<string, boolean>) => update<string[]>("collapsed", dbKey(), (shut) => applyOpen(shut ?? [], edits)).catch(() => { /* storage blocked */ });
   $effect(() => {
     if (!storageKey || db.root === null) return;
     loaded = false;
     run<string[] | undefined>("collapsed", "readonly", (st) => st.get(dbKey()))
-      .then((v) => {
-        const shut = new Set((v ?? []).filter((g) => !touched.has(g)));
-        for (const [g, open] of touched) if (!open) shut.add(g);
-        collapsed = [...shut];
-      })
+      .then((v) => { collapsed = applyOpen(v ?? [], touched); })
       .catch(() => { /* storage blocked */ })
-      .finally(() => { const dirty = touched.size > 0; touched.clear(); loaded = true; if (dirty) save(); });
+      .finally(() => { const edits = new Map(touched); touched.clear(); loaded = true; if (edits.size) save(edits); });
   });
   const isOpen = (p: string) => !grouped || !collapsed.includes(p);
   const setOpen = (p: string, open: boolean) => {
     if (open === isOpen(p)) return;
-    collapsed = open ? collapsed.filter((x) => x !== p) : [...collapsed, p];
+    const edit = new Map([[p, open]]);
+    collapsed = applyOpen(collapsed, edit);
     if (!storageKey) return;
-    if (loaded) save(); else touched.set(p, open);
+    if (loaded) save(edit); else touched.set(p, open);
   };
 
   // the selection is a row (`selected`) or a group header (`selGroup`, only while no row is selected)
@@ -83,7 +82,7 @@
 
   // ↑/↓ move through the stops, ←/→ collapse and expand the selected group (not while a field or a radio group has the keys)
   function onkey(e: KeyboardEvent) {
-    if (!keys || (e.target !== document.body && !table?.contains(e.target as Node)) || (e.target as HTMLElement).closest("input, select, textarea, .gutter, .seg") || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (!keys || (e.target !== document.body && !table?.contains(e.target as Node)) || (e.target as HTMLElement).closest("input, select, textarea, .gutter, .seg, [popover]") || e.metaKey || e.ctrlKey || e.altKey) return;
     const grp = curGroup();
     if ((e.key === "ArrowDown" || e.key === "ArrowUp") && seq.length) {
       e.preventDefault();
@@ -146,7 +145,7 @@
         {#if isOpen(g.name)}
           {#each g.rows as r (rowKey(r))}
             <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
-            <tr class="row" class:sel={selected === rowKey(r)} data-tone={tone?.(r)} onclick={(e) => { if ((e.target as HTMLElement).closest("a, input, button")) return; selGroup = null; onselect(rowKey(r), "click"); }}>
+            <tr class="row" class:sel={selected === rowKey(r)} data-tone={tone?.(r)} onclick={(e) => { if ((e.target as HTMLElement).closest("a, input, button, label, [popover]")) return; selGroup = null; onselect(rowKey(r), "click"); }}>
               {#each columns as c}<td class={c.cls}>{@render cell(r, c.key)}</td>{/each}
             </tr>
           {/each}
