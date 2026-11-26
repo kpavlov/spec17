@@ -102,15 +102,19 @@ blockquote { margin: 1rem 0; padding: .1rem 1rem; border-left: 3px solid var(--a
   header .search { margin-right: auto; }
   header .brand { margin-right: 1.5rem; }
   .wrap { grid-template-columns: 14rem minmax(0, 1fr); grid-template-rows: 1fr auto; column-gap: 2.5rem; }
-  .wrap > nav { grid-row: span 2; }
-  nav { position: sticky; top: 3.5rem; align-self: start; max-height: calc(100vh - 4rem); overflow-y: auto; padding: 1.25rem 0; }
+  /* .wrap > nav: Hugo's table of contents is a <nav> too, and must not get the sidebar's padding or its own scroll box */
+  .wrap > nav { grid-row: span 2; position: sticky; top: 3.5rem; align-self: start; max-height: calc(100vh - 4rem); overflow-y: auto; padding: 1.25rem 0; }
+  .wrap > nav a:focus-visible { outline-offset: -2px; } /* inside the link: the scrolling sidebar would clip an outer ring */
   nav ul { display: block; border: 0; padding: 0; }
   nav li { padding: .15rem 0; }
   .wrap > nav > ul > li { padding: 1px 0; }
   #TableOfContents { display: block; font-size: var(--text-sm); }
-  #TableOfContents ul { padding: .15rem 0 .15rem .9rem; }
-  #TableOfContents > ul { border-left: 2px solid var(--accent-2); margin-left: 10px; } /* one rule for the whole tree; nested lists only indent */
+  #TableOfContents ul { padding: .15rem 0; }
+  #TableOfContents > ul { border-left: 2px solid var(--line); margin-left: 10px; } /* one line for the whole tree */
+  #TableOfContents a { display: block; position: relative; padding-left: .9rem; }
+  #TableOfContents li li a { padding-left: 1.8rem; } /* Hugo lists h2 and h3 only */
   #TableOfContents a.active { color: var(--accent); font-weight: var(--weight-semibold); }
+  #TableOfContents a.active::before { content: ''; position: absolute; top: 0; bottom: 0; left: -2px; width: 2px; background: var(--accent); } /* over the line */
   .anchor { opacity: 0; }
   h1:hover .anchor, h2:hover .anchor, h3:hover .anchor, .anchor:focus { opacity: 1; }
   main { padding-top: 1.25rem; }

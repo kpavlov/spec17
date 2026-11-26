@@ -13,7 +13,7 @@
 - Rebuild the Dashboard around a summary strip and one problem list grouped into errors and collapsed warnings. Specs to compare are now listed; before, they counted in the total but were not shown.
 - Add display settings: row density, text size and theme. Make the dark theme a lighter blue-grey, like Zed's One Dark, and the light theme's violet accent more saturated.
 - Add a vivid brand violet for the product name in the dashboard and docs headers and for the browser tab icon.
-- Docs site: fonts, product name, tab icon, theme button, keyboard hints and menu highlight now match the dashboard; text uses its type scale one step larger, and the stripe along the top is the brand violet.
+- Docs site: fonts, product name, tab icon, theme button, keyboard hints and menu highlight now match the dashboard. The table of contents sits close under its page, without a second scroll area, and marks the current section on a neutral line. Text uses its type scale one step larger, and the stripe along the top is the brand violet.
 - Add a command palette (⌘K or Ctrl+K) over views, actions, saved views and requirement IDs.
 - Turn `state:none level:must` words in the requirement search into filters on Enter.
 - Save search-and-filter views per repository. This upgrades the browser database: an older spec17 served on the same port can then no longer load its reviewed marks (releases up to 0.5.0 offer no reset; clear the site's data).
