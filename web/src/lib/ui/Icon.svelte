@@ -28,6 +28,8 @@
     trash: '<path d="M3 6h18M8 6V4h8v2M19 6l-1 15H6L5 6"/>',
     check: '<path d="m5 12 5 5L20 7"/>',
     "check-alert": '<path d="m3 13 4 4 8-9"/><path d="M20 7v6M20 17h.01"/>',
+    folder: '<path d="M3 6a2 2 0 0 1 2-2h4l2 3h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/>',
+    branch: '<path d="M6 3v12"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/>',
   };
   export type IconName = keyof typeof PATHS;
 </script>

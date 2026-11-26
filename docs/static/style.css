@@ -10,7 +10,7 @@ header .gh { display: inline-flex; align-items: center; gap: .65rem; }
 header .gh svg { fill: currentColor; }
 header button { font: inherit; color: var(--muted); background: none; border: 1px solid var(--line-strong); border-radius: var(--radius); padding: .1rem .5rem; cursor: pointer; }
 header button:hover { color: var(--accent); border-color: var(--accent); }
-header .brand { color: var(--accent); font-weight: 700; }
+header .brand { color: var(--brand); text-shadow: 0 0 .6em var(--brand-glow); font-weight: 700; }
 header .brand:hover { color: var(--accent-2); }
 .search { position: relative; flex: 1 1 100%; order: 3; }
 .search input { box-sizing: border-box; width: 100%; font: inherit; padding: var(--input-pad); color: var(--fg); background: var(--card); border: 1px solid var(--line-strong); border-radius: var(--radius); }

@@ -2,16 +2,18 @@
    Theme: `auto` follows the OS; data-theme="light|dark" on <html> forces one. Every colour is a light-dark() pair. */
 :root {
   color-scheme: light dark;
-  --bg: light-dark(#fafaf8, #1b1b1b);
-  --card: light-dark(#ffffff, #262626);
-  --tooltip-bg: light-dark(#efede7, #3c3a36);
-  --raised: light-dark(#f0f0ec, #323232);
-  --fg: light-dark(#1f2328, #e6e6e6);
-  --muted: light-dark(#555e6b, #c2c2c2);
-  --line: light-dark(#e2e2dd, #424242);
-  --accent: light-dark(#6d3bd2, #b69cff);
+  --bg: light-dark(#fafaf8, #282c33);
+  --card: light-dark(#ffffff, #2f343e);
+  --tooltip-bg: light-dark(#efede7, #3a404b);
+  --raised: light-dark(#f0f0ec, #363c46);
+  --fg: light-dark(#1f2328, #dce0e5);
+  --muted: light-dark(#555e6b, #bcc2cc);
+  --line: light-dark(#e2e2dd, #464b57);
+  --accent: light-dark(#7222e6, #c6b2ff);
+  --brand: light-dark(#a100ff, #c082ff); /* the product name and icon only: one vivid hue, lighter on dark; links and controls use --accent */
+  --brand-glow: light-dark(transparent, rgb(192 130 255 / .55)); /* the name shines on dark only; on a light page a glow just blurs it */
   --ok: light-dark(#13693d, #4ade80);
-  --line-strong: light-dark(#838b96, #8a8a8a); /* control borders: >= 3:1 (WCAG 1.4.11) */
+  --line-strong: light-dark(#838b96, #878a98); /* control borders: >= 3:1 (WCAG 1.4.11) */
   --warn: light-dark(#8a5a00, #f0c674);
   --bad: light-dark(#a3262e, #ff9a9a);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

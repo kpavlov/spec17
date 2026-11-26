@@ -51,8 +51,18 @@ test("secondary text reaches WCAG 4.5:1 and APCA Lc 60", () => {
 
 // [WEB-63]
 test("coloured text reaches WCAG 4.5:1, control borders and the focus ring 3:1", () => {
-  check(["accent", "accent-2", "accent-3", "ok", "warn", "bad", "info"], ["bg", "card"], 4.5, wcag, "WCAG");
+  check(["accent", "brand", "accent-2", "accent-3", "ok", "warn", "bad", "info"], ["bg", "card"], 4.5, wcag, "WCAG");
   check(["line-strong", "accent"], ["bg", "card"], 3, wcag, "WCAG");
+});
+
+// [WEB-63]
+test("accent text stays at WCAG 4.5:1 on the selected row's tint", () => {
+  const p = Number(css.match(/--tint-sel:\s*color-mix\(in srgb, var\(--accent\) (\d+)%, var\(--card\)/)[1]) / 100;
+  for (const [t, theme] of THEMES.entries()) {
+    const accent = pairs.accent[t], card = rgb(pairs.card[t]);
+    const tint = "#" + rgb(accent).map((c, i) => Math.round((c * p + card[i] * (1 - p)) * 255).toString(16).padStart(2, "0")).join("");
+    assert.ok(wcag(accent, tint) >= 4.5, `${theme}: ${wcag(accent, tint).toFixed(2)}`);
+  }
 });
 
 // [WEB-63]

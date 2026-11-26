@@ -27,7 +27,12 @@
 <header>
   <h1><a href="/">spec17</a></h1>
   <span class="dot" data-tone={up === true ? "ok" : up === false ? "bad" : undefined} role="status" title={up === null ? "server: connecting" : up ? "server: connected" : "server: disconnected, retrying"}></span>
-  {#if repo}<span class="where mono muted"><span title={root}>{repo}</span>{#if data.branch}{" · "}<span title="current git branch">{data.branch}</span>{/if}</span>{/if}
+  {#if repo}
+    <span class="where">
+      <span class="repo" title={root}><span role="img" aria-label="repository"><Icon name="folder" /></span><span class="name">{repo}</span></span>
+      {#if data.branch}<span class="branch mono muted" title="current git branch: {data.branch}"><span role="img" aria-label="git branch"><Icon name="branch" /></span><span class="name">{data.branch}</span></span>{/if}
+    </span>
+  {/if}
   <span class="grow"></span>
   {#if data.loadedAt}<span class="age muted" title="The dashboard loaded the scan at {new Date(data.loadedAt).toLocaleTimeString()}">{age}</span>{/if}
   <button class="icon" onclick={togglePalette} title="Command palette (⌘K or Ctrl+K)" aria-label="command palette" aria-haspopup="dialog"><Icon name="search" /></button>
@@ -41,15 +46,26 @@
   header > :not(.where) { flex-shrink: 0; }
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--tone, var(--muted)); margin-left: -4px; }
   .icon { display: inline-flex; align-items: center; justify-content: center; position: relative; min-width: 32px; min-height: 32px; padding: 6px 9px; line-height: 1.2; }
-  .where { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* repo · branch: apart from the product name; when space runs out the branch shortens first */
+  .where { display: flex; align-items: center; gap: .6rem; min-width: 0; overflow: hidden; padding-left: .75rem; border-left: 1px solid var(--line-strong); white-space: nowrap; }
+  .repo, .branch { display: inline-flex; align-items: center; gap: .35em; min-width: 0; }
+  .repo { flex: 0 1 auto; font-weight: var(--weight-semibold); }
+  .branch { flex: 0 100 auto; padding: 1px .5rem; border: 1px solid var(--line); border-radius: var(--radius); background: var(--raised); }
+  .where [role="img"] { display: inline-flex; color: var(--muted); }
+  .where .name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
   .age { font-size: var(--text-sm); white-space: nowrap; }
   h1 { margin: 0; font-size: var(--text-section); font-weight: var(--weight-bold); letter-spacing: -0.01em; }
-  h1 a { display: inline-block; min-height: 24px; padding-block: 2px; color: inherit; text-decoration: none; }
+  h1 a { display: inline-block; min-height: 24px; padding-block: 2px; color: var(--brand); text-shadow: 0 0 .6em var(--brand-glow); text-decoration: none; }
   a.tab.icon { padding: 6px 9px; }
   a.tab.icon .badge { position: absolute; top: -4px; right: -4px; margin: 0; min-width: 14px; padding: 0 3px; font-size: var(--text-meta); }
   @media (max-width: 48rem) {
     header { padding: 0 8px; }
     .age { display: none; }
+    /* no room side by side: one line each */
+    .where { flex-direction: column; align-items: flex-start; gap: 0; padding-left: .5rem; font-size: var(--text-meta); }
+    .repo, .branch { flex: none; max-width: 100%; }
+    .where .mono { font-size: inherit; }
+    .branch { padding: 0; border: 0; background: none; }
     .icon { padding: 4px 6px; }
   }
 </style>
